@@ -1,0 +1,28 @@
+{
+  "name": "Meza - 位置ベース目覚ましアプリ",
+  "short_name": "Meza",
+  "description": "指定した時間に指定した場所に到着しないとペナルティが発生する目覚ましアプリ",
+  "theme_color": "#FFAD2F",
+  "background_color": "#1e293b",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["lifestyle", "utilities"],
+  "lang": "ja",
+  "dir": "ltr"
+} 
