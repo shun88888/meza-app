@@ -1,6 +1,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { SUPABASE_CONFIG, IS_DEMO_MODE } from './supabase-config'
 
 // Lazy client creation to avoid initial load overhead
 let clientSideClient: any = null
@@ -22,22 +23,20 @@ export const createClientSideClient = () => {
 // Admin client (for server actions and API routes) - only create when needed
 export const getSupabaseClient = () => {
   if (!adminClient) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.log('Supabase credentials not found, using demo mode')
+    if (IS_DEMO_MODE) {
+      console.log('デモモードが有効です')
       return null
     }
     
     try {
-      adminClient = createClient(supabaseUrl, supabaseAnonKey, {
+      adminClient = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
         auth: {
           persistSession: false
         }
       })
+      console.log('✅ Supabaseクライアント接続成功')
     } catch (error) {
-      console.log('Supabase client creation failed')
+      console.log('❌ Supabaseクライアント作成失敗:', error)
       return null
     }
   }
