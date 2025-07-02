@@ -4,12 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:mobile": "next dev -H 0.0.0.0",
-    "mobile": "next dev -H 0.0.0.0",
+    "dev:mobile": "next dev -H 0.0.0.0 -p 3000",
+    "mobile": "next dev -H 0.0.0.0 -p 3000",
+    "mobile:https": "next dev -H 0.0.0.0 -p 3000 --experimental-https",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "qr": "node mobile-qr.js"
+    "qr": "node mobile-qr.js",
+    "install:mobile": "npm install && npm run qr"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.0.2",
@@ -17,6 +19,7 @@
     "@stripe/stripe-js": "^2.4.0",
     "@supabase/auth-helpers-nextjs": "^0.8.7",
     "@supabase/supabase-js": "^2.38.5",
+    "@types/react-swipeable": "^4.3.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "date-fns": "^3.0.6",
@@ -24,10 +27,12 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.294.0",
     "next": "14.0.4",
+    "next-pwa": "^5.6.0",
     "qrcode-terminal": "^0.12.0",
     "react": "^18",
     "react-dom": "^18",
     "react-leaflet": "^4.2.1",
+    "react-swipeable": "^7.0.2",
     "stripe": "^14.9.0",
     "tailwind-merge": "^2.1.0",
     "tailwindcss-animate": "^1.0.7"
@@ -42,6 +47,7 @@
     "eslint-config-next": "14.0.4",
     "postcss": "^8",
     "tailwindcss": "^3.3.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "webpack": "^5.0.0"
   }
-} 
+}

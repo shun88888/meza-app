@@ -10,20 +10,68 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Meza - 位置ベース目覚ましアプリ',
-  description: '指定した時間に指定した場所に到着しないとペナルティが発生する目覚ましアプリ',
+  title: 'Meza - 位置ベースペナルティアラーム',
+  description: '朝活をサポートする位置ベースペナルティアラームアプリ - 起床時刻に指定場所に移動しないとペナルティが発生',
   manifest: '/manifest.json',
-  icons: {
-    icon: '/icon-192x192.png',
-    apple: '/icon-192x192.png',
+  keywords: ['朝活', 'アラーム', '位置情報', 'ペナルティ', 'PWA', 'モバイル'],
+  authors: [{ name: 'Meza Team' }],
+  creator: 'Meza',
+  publisher: 'Meza',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
   },
+  icons: {
+    icon: [
+      { url: '/icon-72x72.png', sizes: '72x72', type: 'image/png' },
+      { url: '/icon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/icon-128x128.png', sizes: '128x128', type: 'image/png' },
+      { url: '/icon-144x144.png', sizes: '144x144', type: 'image/png' },
+      { url: '/icon-152x152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-384x384.png', sizes: '384x384', type: 'image/png' },
+      { url: '/icon-512x512.png', sizes: '512x512', type: 'image/png' }
+    ],
+    apple: [
+      { url: '/icon-152x152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }
+    ]
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Meza',
+    startupImage: [
+      { url: '/icon-512x512.png', media: '(device-width: 414px) and (device-height: 896px)' }
+    ]
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'Meza',
+    title: 'Meza - 位置ベースペナルティアラーム',
+    description: '朝活をサポートする位置ベースペナルティアラームアプリ',
+    images: [{ url: '/icon-512x512.png', width: 512, height: 512, alt: 'Meza App' }]
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Meza - 位置ベースペナルティアラーム',
+    description: '朝活をサポートする位置ベースペナルティアラームアプリ',
+    images: ['/icon-512x512.png']
+  }
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#FFAD2F',
+  minimumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FFAD2F' },
+    { media: '(prefers-color-scheme: dark)', color: '#FF8A00' }
+  ],
 }
 
 export default function RootLayout({
@@ -33,8 +81,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" className={inter.variable}>
-      <body className={`${inter.className} antialiased`}>
-        {children}
+      <body className={`${inter.className} antialiased bg-gradient-to-br from-orange-50 to-yellow-50 min-h-screen touch-manipulation`}>
+        <div className="min-h-screen pb-safe">
+          {children}
+        </div>
+        
+        {/* モバイル最適化されたService Worker */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -42,11 +94,69 @@ export default function RootLayout({
                 window.addEventListener('load', () => {
                   navigator.serviceWorker.register('/sw.js')
                     .then((registration) => {
-                      console.log('SW registered: ', registration);
+                      console.log('✅ Service Worker registered successfully:', registration);
+                      
+                      // PWAアップデート検出
+                      registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        if (newWorker) {
+                          newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                              console.log('🔄 New app version available! Please refresh.');
+                            }
+                          });
+                        }
+                      });
                     })
-                    .catch((registrationError) => {
-                      console.log('SW registration failed: ', registrationError);
+                    .catch((error) => {
+                      console.error('❌ Service Worker registration failed:', error);
                     });
+                });
+                
+                // Service Workerメッセージ受信
+                navigator.serviceWorker.addEventListener('message', (event) => {
+                  console.log('📩 Message from SW:', event.data);
+                });
+              }
+              
+              // モバイル専用初期化
+              if (typeof window !== 'undefined') {
+                // タッチ遅延防止
+                document.addEventListener('touchstart', function() {}, { passive: true });
+                
+                // 画面向き変更対応
+                window.addEventListener('orientationchange', () => {
+                  setTimeout(() => {
+                    window.scrollTo(0, 0);
+                  }, 100);
+                });
+                
+                // iOS PWA対応
+                if (window.navigator.standalone) {
+                  document.body.classList.add('standalone-app');
+                }
+                
+                // PWAインストール可能性の確認とプロンプト表示
+                let deferredPrompt;
+                window.addEventListener('beforeinstallprompt', (e) => {
+                  e.preventDefault();
+                  deferredPrompt = e;
+                  
+                  // モバイルデバイスかつまだインストールしていない場合に通知表示
+                  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+                  
+                  if (isMobile && !isStandalone) {
+                    setTimeout(() => {
+                      console.log('💡 PWAインストール可能: ブラウザメニューから「ホーム画面に追加」してください');
+                    }, 3000);
+                  }
+                });
+                
+                // PWAインストール完了時
+                window.addEventListener('appinstalled', () => {
+                  console.log('✅ PWA successfully installed');
+                  deferredPrompt = null;
                 });
               }
             `,

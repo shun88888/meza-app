@@ -66,6 +66,18 @@ module.exports = {
           "orange-light": "#FFC233",
         }
       },
+      spacing: {
+        'safe': 'env(safe-area-inset-bottom)',
+        'safe-top': 'env(safe-area-inset-top)',
+        'safe-left': 'env(safe-area-inset-left)', 
+        'safe-right': 'env(safe-area-inset-right)',
+      },
+      screens: {
+        'xs': '475px',
+        'touch': { 'raw': '(hover: none) and (pointer: coarse)' },
+        'mouse': { 'raw': '(hover: hover) and (pointer: fine)' },
+        'standalone': { 'raw': '(display-mode: standalone)' },
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -87,5 +99,43 @@ module.exports = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    function({ addUtilities }) {
+      addUtilities({
+        '.touch-manipulation': {
+          'touch-action': 'manipulation',
+        },
+        '.touch-pan-x': {
+          'touch-action': 'pan-x',
+        },
+        '.touch-pan-y': {
+          'touch-action': 'pan-y',
+        },
+        '.touch-none': {
+          'touch-action': 'none',
+        },
+        '.pb-safe': {
+          'padding-bottom': 'env(safe-area-inset-bottom)',
+        },
+        '.pt-safe': {
+          'padding-top': 'env(safe-area-inset-top)',
+        },
+        '.pl-safe': {
+          'padding-left': 'env(safe-area-inset-left)',
+        },
+        '.pr-safe': {
+          'padding-right': 'env(safe-area-inset-right)',
+        },
+        '.h-screen-mobile': {
+          'height': '100vh',
+          'height': '100dvh',
+        },
+        '.min-h-screen-mobile': {
+          'min-height': '100vh',
+          'min-height': '100dvh',
+        },
+      })
+    }
+  ],
 } 
