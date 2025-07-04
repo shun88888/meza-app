@@ -17,8 +17,9 @@ export default function ActiveChallengePage() {
   const [challengeData, setChallengeData] = useState<ChallengeData | null>(null)
   const slideToWakeRef = useRef<SlideToWakeRef>(null)
   
-  // Set dark slate theme color for active challenge page
+  // Set dark slate theme color and background for active challenge page
   useEffect(() => {
+    // Set theme color
     const metaThemeColor = document.querySelector('meta[name="theme-color"]')
     if (metaThemeColor) {
       metaThemeColor.setAttribute('content', '#0f172a')
@@ -27,6 +28,18 @@ export default function ActiveChallengePage() {
       meta.name = 'theme-color'
       meta.content = '#0f172a'
       document.head.appendChild(meta)
+    }
+    
+    // Set background gradient
+    document.body.style.background = 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)'
+    
+    return () => {
+      // Reset theme color and background when component unmounts
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', '#FED7AA')
+      }
+      document.body.style.background = 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)'
     }
   }, [])
   

@@ -58,6 +58,10 @@ export const metadata: Metadata = {
     title: 'Meza - 位置ベースペナルティアラーム',
     description: '朝活をサポートする位置ベースペナルティアラームアプリ',
     images: ['/icon-512x512.png']
+  },
+  other: {
+    'msapplication-navbutton-color': '#FED7AA',
+    'apple-mobile-web-app-status-bar-style': 'default'
   }
 }
 
@@ -79,11 +83,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" className={inter.variable}>
-      <head>
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="theme-color" content="#FED7AA" />
-        <meta name="msapplication-navbutton-color" content="#FED7AA" />
-      </head>
       <body className={`${inter.className} antialiased min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
         {/* 背景レイヤー - Safe Area全体をカバー */}
         <div className="fixed inset-0 bg-gradient-to-br from-orange-100 to-yellow-100 -z-10" />

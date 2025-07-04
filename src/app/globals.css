@@ -160,12 +160,12 @@
 }
 
 /* Safe area utilities for mobile */
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
 .pt-safe {
   padding-top: env(safe-area-inset-top);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .pl-safe {
@@ -186,6 +186,19 @@
   min-height: 100dvh;
 }
 
+/* Full-screen with safe areas */
+.full-screen-safe {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 1000 !important;
+}
+
 /* 各ページ固有の背景グラデーション */
 .bg-gradient-home {
   background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
@@ -201,17 +214,4 @@
 
 .bg-gradient-active {
   background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-}
-
-/* Full-screen with safe areas */
-.full-screen-safe {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  height: 100dvh !important;
-  z-index: 1000 !important;
 }
