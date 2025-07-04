@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Meza',
     startupImage: [
       { url: '/icon-512x512.png', media: '(device-width: 414px) and (device-height: 896px)' }
@@ -63,15 +63,13 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-  minimumScale: 1,
+  initialScale: 1.0,
+  maximumScale: 1.0,
+  minimumScale: 1.0,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#FFAD2F' },
-    { media: '(prefers-color-scheme: dark)', color: '#FF8A00' }
-  ],
+  interactiveWidget: 'resizes-content',
+  // themeColor will be set dynamically by each page
 }
 
 export default function RootLayout({
@@ -81,8 +79,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" className={inter.variable}>
-      <body className={`${inter.className} antialiased bg-gradient-to-br from-orange-50 to-yellow-50 min-h-screen touch-manipulation`}>
-        <div className="min-h-screen pb-safe">
+      <body className={`${inter.className} antialiased bg-gradient-to-br from-orange-50 to-yellow-50 min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
+        <div className="min-h-screen-mobile pb-safe w-full overflow-x-hidden">
           {children}
         </div>
         

@@ -16,6 +16,8 @@ export default function CompleteChallengePage() {
   const [loading, setLoading] = useState(false)
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
+  
+
 
   const getCurrentLocation = () => {
     setLoading(true)
@@ -69,9 +71,9 @@ export default function CompleteChallengePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen-mobile w-full max-w-full overflow-hidden bg-gray-50 fixed inset-0">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-4">
+      <div className="bg-gray-50/95 border-b border-gray-200 p-4">
         <div className="flex items-center">
           <button
             onClick={() => router.back()}

@@ -16,6 +16,21 @@ export default function ActiveChallengePage() {
   const [isCheckingLocation, setIsCheckingLocation] = useState(false)
   const [challengeData, setChallengeData] = useState<ChallengeData | null>(null)
   const slideToWakeRef = useRef<SlideToWakeRef>(null)
+  
+  // Set dark slate theme color for active challenge page
+  useEffect(() => {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', '#0f172a')
+    } else {
+      const meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      meta.content = '#0f172a'
+      document.head.appendChild(meta)
+    }
+  }, [])
+  
+
 
   useEffect(() => {
     // Load challenge data from localStorage
@@ -175,16 +190,16 @@ export default function ActiveChallengePage() {
 
   if (!challengeData) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-center">
+      <div className="full-screen-safe overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-center" style={{ zIndex: 1001 }}>
         <div className="text-gray-400">チャレンジデータを読み込み中...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white flex flex-col">
+    <div className="full-screen-safe overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white flex flex-col" style={{ zIndex: 1001 }}>
       {/* Header */}
-      <div className="flex-1 flex flex-col items-center justify-center px-8 opacity-0 animate-[fadeIn_0.05s_ease-out_forwards]">
+      <div className="flex-1 flex flex-col items-center justify-center px-8 pt-safe opacity-0 animate-[fadeIn_0.05s_ease-out_forwards]">
         <div className="text-center mb-12">
           <h1 className="text-xl font-light text-gray-300 mb-2">チャレンジ実行中</h1>
           <div className="w-16 h-1 bg-[#FFAD2F] mx-auto rounded-full"></div>
@@ -218,7 +233,7 @@ export default function ActiveChallengePage() {
       </div>
 
       {/* Slide to Dissolve */}
-      <div className="px-6 pb-8">
+      <div className="px-6 pb-8 pb-safe">
         <div className="mb-3 text-center">
           <p className="text-xs text-gray-400">100m以上移動してチャレンジを解除</p>
         </div>

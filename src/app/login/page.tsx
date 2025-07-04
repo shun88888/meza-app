@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,21 @@ function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  
+  // Set white theme color for login page
+  useEffect(() => {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', '#ffffff')
+    } else {
+      const meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      meta.content = '#ffffff'
+      document.head.appendChild(meta)
+    }
+  }, [])
+  
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,7 +57,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="h-screen-mobile w-full max-w-full overflow-hidden bg-gray-50 flex items-center justify-center px-4 fixed inset-0">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">Meza</h1>

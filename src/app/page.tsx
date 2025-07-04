@@ -1,12 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 
 export default function HomePage() {
   const [wakeTime, setWakeTime] = useState({ hours: 7, minutes: 0 })
   const router = useRouter()
+  
+  // Set dark slate theme color for home page
+  useEffect(() => {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', '#0f172a')
+    } else {
+      const meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      meta.content = '#0f172a'
+      document.head.appendChild(meta)
+    }
+  }, [])
+  
+
 
   const formatTimeDisplay = (hours: number, minutes: number) => {
     return `${hours} : ${minutes.toString().padStart(2, '0')}`
@@ -47,9 +62,9 @@ export default function HomePage() {
   const range = getOptimalWakeRange()
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div className="full-screen-safe overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white" style={{ zIndex: 1001 }}>
       {/* Header */}
-      <header className="px-4 py-8">
+      <header className="px-4 py-8 w-full max-w-full pt-safe">
         <div className="flex items-center justify-between">
           <div className="flex items-center bg-slate-800/50 rounded-full px-4 py-2">
             <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -139,7 +154,7 @@ export default function HomePage() {
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-slate-700">
-        <div className="max-w-md mx-auto px-4 py-3">
+        <div className="max-w-md mx-auto px-4 py-3 pb-safe">
           <div className="flex justify-around">
             <button
               onClick={() => router.push('/')}

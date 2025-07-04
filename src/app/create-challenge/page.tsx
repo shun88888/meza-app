@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import SlideToWake from '@/components/SlideToWake'
@@ -33,6 +33,23 @@ interface ChallengeData {
 export default function CreateChallengePage() {
   const router = useRouter()
   const [showCountdown, setShowCountdown] = useState(false)
+  
+  // Set white theme color for create challenge page
+  useEffect(() => {
+    if (!showCountdown) {
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', '#ffffff')
+      } else {
+        const meta = document.createElement('meta')
+        meta.name = 'theme-color'
+        meta.content = '#ffffff'
+        document.head.appendChild(meta)
+      }
+    }
+  }, [showCountdown])
+  
+
   
   // Set default wake time to tomorrow at 8:00 AM
   const getDefaultWakeTime = () => {
@@ -135,9 +152,9 @@ export default function CreateChallengePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 relative">
+    <div className="full-screen-safe overflow-hidden bg-gray-50 relative" style={{ zIndex: 1001 }}>
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-sm border-b border-gray-200 p-4">
+      <div className="absolute top-0 left-0 right-0 z-30 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 p-4 pt-safe">
         <div className="flex items-center">
           <button
             onClick={() => router.back()}
@@ -157,14 +174,14 @@ export default function CreateChallengePage() {
         <MapPicker
           location={challengeData.targetLocation}
           onLocationSelect={handleLocationSelect}
-          height="100vh"
+          height="100%"
           className="w-full h-full"
         />
       </div>
 
       {/* Bottom Overlay with Settings */}
       <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/50 via-black/20 to-transparent">
-        <div className="p-4">
+        <div className="p-4 pb-safe">
           {/* Settings Cards Container */}
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-4">
             

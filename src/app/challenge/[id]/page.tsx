@@ -27,6 +27,8 @@ export default function ChallengePage() {
   const [challenge, setChallenge] = useState<Challenge | null>(null)
   const [loading, setLoading] = useState(true)
 
+
+
   useEffect(() => {
     // Mock challenge data for demo
     const mockChallenge: Challenge = {

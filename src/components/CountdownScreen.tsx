@@ -11,6 +11,27 @@ interface CountdownScreenProps {
 export default function CountdownScreen({ onComplete, onCancel, duration = 3 }: CountdownScreenProps) {
   const [timeLeft, setTimeLeft] = useState(duration)
 
+  // Set orange theme color for countdown screen
+  useEffect(() => {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', '#FFAD2F')
+    } else {
+      const meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      meta.content = '#FFAD2F'
+      document.head.appendChild(meta)
+    }
+    
+    return () => {
+      // Reset theme color when component unmounts
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', '#0f172a')
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (timeLeft <= 0) {
       onComplete()
@@ -25,7 +46,7 @@ export default function CountdownScreen({ onComplete, onCancel, duration = 3 }: 
   }, [timeLeft, onComplete])
 
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-b from-[#FFE72E] via-[#FFAD2F] to-[#FF8A00] flex flex-col items-center justify-center text-white px-8 opacity-0 animate-[fadeIn_0.05s_ease-out_forwards]">
+    <div className="full-screen-safe bg-gradient-to-b from-[#FFE72E] via-[#FFAD2F] to-[#FF8A00] flex flex-col items-center justify-center text-white px-8 pt-safe pb-safe opacity-0 animate-[fadeIn_0.05s_ease-out_forwards]" style={{ zIndex: 1001 }}>
       {/* Top text */}
       <div className="text-center mb-16">
         <h1 className="text-2xl font-light">Are you sure?</h1>
@@ -46,7 +67,7 @@ export default function CountdownScreen({ onComplete, onCancel, duration = 3 }: 
       </div>
 
       {/* Cancel button */}
-      <div className="absolute bottom-20">
+      <div className="absolute bottom-20 pb-safe">
         <button
           onClick={onCancel}
           className="flex items-center justify-center w-16 h-16 bg-white/20 rounded-full border border-white/30 hover:bg-white/30 transition-colors duration-50"
@@ -60,7 +81,7 @@ export default function CountdownScreen({ onComplete, onCancel, duration = 3 }: 
       </div>
 
       {/* Progress indicator */}
-      <div className="absolute bottom-8 left-8 right-8">
+      <div className="absolute bottom-8 left-8 right-8 pb-safe">
         <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
           <div 
             className="h-full bg-white rounded-full"
