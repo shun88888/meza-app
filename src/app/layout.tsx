@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'Meza',
     startupImage: [
       { url: '/icon-512x512.png', media: '(device-width: 414px) and (device-height: 896px)' }
@@ -69,7 +69,7 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: 'cover',
   interactiveWidget: 'resizes-content',
-  // themeColor will be set dynamically by each page
+  themeColor: '#FED7AA'
 }
 
 export default function RootLayout({
@@ -79,8 +79,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" className={inter.variable}>
-      <body className={`${inter.className} antialiased bg-gradient-to-br from-orange-50 to-yellow-50 min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
-        <div className="min-h-screen-mobile pb-safe w-full overflow-x-hidden">
+      <head>
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="theme-color" content="#FED7AA" />
+        <meta name="msapplication-navbutton-color" content="#FED7AA" />
+      </head>
+      <body className={`${inter.className} antialiased min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
+        {/* 背景レイヤー - Safe Area全体をカバー */}
+        <div className="fixed inset-0 bg-gradient-to-br from-orange-100 to-yellow-100 -z-10" />
+        
+        {/* メインコンテンツ - Safe Area対応 */}
+        <div className="min-h-screen-mobile pt-safe pb-safe w-full overflow-x-hidden relative z-10">
           {children}
         </div>
         

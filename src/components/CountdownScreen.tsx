@@ -11,24 +11,35 @@ interface CountdownScreenProps {
 export default function CountdownScreen({ onComplete, onCancel, duration = 3 }: CountdownScreenProps) {
   const [timeLeft, setTimeLeft] = useState(duration)
 
-  // Set orange theme color for countdown screen
+  // Set orange theme color and background for countdown screen
   useEffect(() => {
+    // Set theme color
     const metaThemeColor = document.querySelector('meta[name="theme-color"]')
     if (metaThemeColor) {
       metaThemeColor.setAttribute('content', '#FFAD2F')
-    } else {
-      const meta = document.createElement('meta')
-      meta.name = 'theme-color'
-      meta.content = '#FFAD2F'
-      document.head.appendChild(meta)
     }
     
+    // Set background gradient for body
+    const originalBackground = document.body.style.background
+    document.body.style.background = 'linear-gradient(135deg, #FFAD2F 0%, #FED7AA 100%)'
+    
+    // Update status bar area background
+    const statusBarStyle = document.createElement('style')
+    statusBarStyle.textContent = `
+      body::before {
+        background: linear-gradient(135deg, #FFAD2F 0%, #FED7AA 100%) !important;
+      }
+    `
+    document.head.appendChild(statusBarStyle)
+    
     return () => {
-      // Reset theme color when component unmounts
+      // Reset theme color and background when component unmounts
       const metaThemeColor = document.querySelector('meta[name="theme-color"]')
       if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', '#0f172a')
+        metaThemeColor.setAttribute('content', '#FED7AA')
       }
+      document.body.style.background = originalBackground
+      document.head.removeChild(statusBarStyle)
     }
   }, [])
 
@@ -46,68 +57,36 @@ export default function CountdownScreen({ onComplete, onCancel, duration = 3 }: 
   }, [timeLeft, onComplete])
 
   return (
-    <div className="full-screen-safe bg-gradient-to-b from-[#FFE72E] via-[#FFAD2F] to-[#FF8A00] flex flex-col items-center justify-center text-white px-8 pt-safe pb-safe opacity-0 animate-[fadeIn_0.05s_ease-out_forwards]" style={{ zIndex: 1001 }}>
-      {/* Top text */}
-      <div className="text-center mb-16">
-        <h1 className="text-2xl font-light">Are you sure?</h1>
-      </div>
-
-      {/* Center content */}
-      <div className="text-center mb-24">
-        <h2 className="text-3xl font-light mb-8">Make up your mind</h2>
-        
-        <div className="mb-4">
-          <span key={timeLeft} className="text-5xl font-bold animate-[pulse_0.05s_ease-out]">
-            {timeLeft}
-          </span>
-          <span className="text-xl ml-2">秒</span>
+    <div className="fixed inset-0 bg-gradient-countdown flex flex-col items-center justify-center text-white px-6 z-50">
+      <div className="text-center space-y-8">
+        <div className="space-y-4">
+          <p className="text-lg font-medium opacity-90">
+            Are you sure?
+          </p>
+          <p className="text-2xl font-bold">
+            Make up your mind
+          </p>
         </div>
         
-        <p className="text-lg">キャンセルできます</p>
-      </div>
-
-      {/* Cancel button */}
-      <div className="absolute bottom-20 pb-safe">
+        <div className="space-y-2">
+          <div className="text-6xl font-bold">
+            {timeLeft}
+          </div>
+          <div className="text-lg">
+            秒
+          </div>
+          <p className="text-sm opacity-75">
+            キャンセルできます
+          </p>
+        </div>
+        
         <button
           onClick={onCancel}
-          className="flex items-center justify-center w-16 h-16 bg-white/20 rounded-full border border-white/30 hover:bg-white/30 transition-colors duration-50"
-          aria-label="キャンセル"
+          className="w-20 h-20 rounded-full border-2 border-white/30 flex items-center justify-center text-2xl font-light hover:bg-white/10 transition-colors"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
+          ×
         </button>
       </div>
-
-      {/* Progress indicator */}
-      <div className="absolute bottom-8 left-8 right-8 pb-safe">
-        <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-white rounded-full"
-            style={{
-              width: '100%',
-              animation: `shrink ${duration}s linear forwards`
-            }}
-          />
-        </div>
-      </div>
-
-      <style jsx>{`
-        @keyframes fadeIn {
-          to {
-            opacity: 1;
-          }
-        }
-        @keyframes pulse {
-          0% { transform: scale(1.02); }
-          100% { transform: scale(1); }
-        }
-        @keyframes shrink {
-          from { width: 100%; }
-          to { width: 0%; }
-        }
-      `}</style>
     </div>
   )
 } 
