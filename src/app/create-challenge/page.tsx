@@ -48,8 +48,11 @@ export default function CreateChallengePage() {
         document.head.appendChild(meta)
       }
       
-      // Set background gradient
+      // Set background gradient for main content
       document.body.style.background = 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)'
+      
+      // Set status bar gradient to match main background
+      document.documentElement.style.setProperty('--status-bar-gradient', 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)')
     }
     
     return () => {
@@ -59,6 +62,7 @@ export default function CreateChallengePage() {
         metaThemeColor.setAttribute('content', '#FED7AA')
       }
       document.body.style.background = 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)'
+      document.documentElement.style.setProperty('--status-bar-gradient', 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)')
     }
   }, [showCountdown])
   

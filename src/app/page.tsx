@@ -21,8 +21,11 @@ export default function HomePage() {
       document.head.appendChild(meta)
     }
     
-    // Set background gradient
+    // Set background gradient for main content
     document.body.style.background = 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)'
+    
+    // Set status bar gradient to match main background
+    document.documentElement.style.setProperty('--status-bar-gradient', 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)')
     
     return () => {
       // Reset theme color and background when component unmounts
@@ -31,6 +34,7 @@ export default function HomePage() {
         metaThemeColor.setAttribute('content', '#FED7AA')
       }
       document.body.style.background = 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)'
+      document.documentElement.style.setProperty('--status-bar-gradient', 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)')
     }
   }, [])
 
