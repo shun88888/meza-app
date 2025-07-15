@@ -57,11 +57,11 @@ const SlideToWake = forwardRef<SlideToWakeRef, SlideToWakeProps>(({
   }
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMove = (clientX: number) => {
       if (!isDragging || disabled || !containerRef.current) return
       
       const rect = containerRef.current.getBoundingClientRect()
-      const x = e.clientX - rect.left
+      const x = clientX - rect.left
       const maxX = containerWidth - 56
       const newPosition = Math.max(0, Math.min(maxX, x))
       const progress = newPosition / maxX
@@ -70,17 +70,10 @@ const SlideToWake = forwardRef<SlideToWakeRef, SlideToWakeProps>(({
       setSlideProgress(progress)
     }
 
+    const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX)
     const handleTouchMove = (e: TouchEvent) => {
-      if (!isDragging || disabled || !containerRef.current) return
-      
-      const rect = containerRef.current.getBoundingClientRect()
-      const x = e.touches[0].clientX - rect.left
-      const maxX = containerWidth - 56
-      const newPosition = Math.max(0, Math.min(maxX, x))
-      const progress = newPosition / maxX
-      
-      setButtonPosition(newPosition)
-      setSlideProgress(progress)
+      e.preventDefault()
+      handleMove(e.touches[0].clientX)
     }
 
     const handleEnd = () => {

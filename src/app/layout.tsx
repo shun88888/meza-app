@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+// CSS読み込み順序を最適化 - leafletを先に読み込み
+import 'leaflet/dist/leaflet.css'
 import './globals.css'
 
 const inter = Inter({ 
@@ -83,6 +85,63 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" className={inter.variable}>
+      <head>
+        {/* Critical CSS - FOUC防止のため最優先で読み込み */}
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            /* Critical Base Styles */
+            *, *::before, *::after { box-sizing: border-box; }
+            html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
+            body { 
+              font-family: ${inter.style.fontFamily}, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              line-height: 1.5; 
+              -webkit-font-smoothing: antialiased;
+              -moz-osx-font-smoothing: grayscale;
+              overflow-x: hidden;
+              background: linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%);
+            }
+            
+            /* Critical Leaflet Styles */
+            .leaflet-container {
+              height: 100% !important;
+              width: 100% !important;
+              position: relative;
+              background: #ddd;
+            }
+            .leaflet-tile-pane { z-index: 1; }
+            .leaflet-map-pane { z-index: 1; position: relative; }
+            .leaflet-tile { width: 256px; height: 256px; }
+            
+            /* Critical Loading Styles */
+            .loading-container {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: #f3f4f6;
+              color: #6b7280;
+              font-size: 14px;
+            }
+            
+            /* Critical Safe Area */
+            .pt-safe { padding-top: env(safe-area-inset-top); }
+            .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+            .min-h-screen-mobile { 
+              min-height: 100vh; 
+              min-height: 100dvh; 
+            }
+            
+            /* Critical Touch Optimization */
+            button, a, [role="button"] {
+              touch-action: manipulation;
+              -webkit-tap-highlight-color: transparent;
+            }
+          `
+        }} />
+        
+        {/* CSS Preloading */}
+        <link rel="preload" href="/_next/static/css/app/layout.css" as="style" />
+        <link rel="preload" href="/_next/static/css/app/globals.css" as="style" />
+      </head>
       <body className={`${inter.className} antialiased min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
         {/* 背景レイヤー - Safe Area全体をカバー */}
         <div className="fixed inset-0 bg-gradient-to-br from-orange-100 to-yellow-100 -z-10" />
@@ -91,6 +150,69 @@ export default function RootLayout({
         <div className="min-h-screen-mobile pt-safe pb-safe w-full overflow-x-hidden relative z-10">
           {children}
         </div>
+        
+        {/* CSS読み込み監視とフォールバック */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // CSS読み込み失敗検知とフォールバック
+              (function() {
+                const cssLoadTimeout = 5000; // 5秒タイムアウト
+                const checkCSSLoad = () => {
+                  const links = document.querySelectorAll('link[rel="stylesheet"]');
+                  let loadedCount = 0;
+                  let totalCount = links.length;
+                  
+                  if (totalCount === 0) return;
+                  
+                  const fallbackCSS = \`
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+                    .loading-container { 
+                      display: flex; align-items: center; justify-content: center; 
+                      background: #f3f4f6; color: #6b7280; padding: 20px; 
+                    }
+                    .leaflet-container { background: #ddd; position: relative; }
+                  \`;
+                  
+                  const applyFallback = () => {
+                    const style = document.createElement('style');
+                    style.textContent = fallbackCSS;
+                    document.head.appendChild(style);
+                    console.warn('CSS読み込み失敗 - フォールバックスタイルを適用');
+                  };
+                  
+                  links.forEach(link => {
+                    link.addEventListener('load', () => {
+                      loadedCount++;
+                      if (loadedCount === totalCount) {
+                        console.log('すべてのCSSが正常に読み込まれました');
+                      }
+                    });
+                    
+                    link.addEventListener('error', () => {
+                      console.warn('CSS読み込み失敗:', link.href);
+                      applyFallback();
+                    });
+                  });
+                  
+                  // タイムアウト監視
+                  setTimeout(() => {
+                    if (loadedCount < totalCount) {
+                      console.warn('CSS読み込みタイムアウト - フォールバックを適用');
+                      applyFallback();
+                    }
+                  }, cssLoadTimeout);
+                };
+                
+                if (document.readyState === 'loading') {
+                  document.addEventListener('DOMContentLoaded', checkCSSLoad);
+                } else {
+                  checkCSSLoad();
+                }
+              })();
+            `
+          }}
+        />
         
         {/* モバイル最適化されたService Worker */}
         <script

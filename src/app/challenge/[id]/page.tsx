@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import MapPicker from '@/components/MapPicker'
 import SlideToWake from '@/components/SlideToWake'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 interface Location {
   lat: number
@@ -57,11 +58,17 @@ export default function ChallengePage() {
     if (!challenge) return
     
     try {
-      // Start challenge logic here
-      // For demo purposes, just show success and redirect
       setChallenge(prev => prev ? { ...prev, status: 'active' } : null)
-      alert('チャレンジが開始されました！')
-      router.push(`/challenge/${challenge.id}/complete`)
+      
+      // Store challenge data for persistence
+      localStorage.setItem('activeChallenge', JSON.stringify({
+        ...challenge,
+        startTime: new Date().toISOString(),
+        startLocation: challenge.homeLocation
+      }))
+      
+      // Navigate to active challenge instead of complete
+      router.push('/active-challenge')
     } catch (error) {
       console.error('Error starting challenge:', error)
       alert('エラーが発生しました。もう一度お試しください。')
@@ -111,12 +118,20 @@ export default function ChallengePage() {
 
       {/* Map Section */}
       <div className="relative bg-white">
-        <MapPicker
-          location={challenge.targetLocation}
-          onLocationSelect={() => {}} // Read-only for this view
-          height="612px"
-          className="w-full"
-        />
+        <ErrorBoundary 
+          fallback={
+            <div className="loading-container" style={{ height: '612px' }}>
+              <div>地図の読み込みに失敗しました</div>
+            </div>
+          }
+        >
+          <MapPicker
+            location={challenge.targetLocation}
+            onLocationSelect={() => {}} // Read-only for this view
+            height="612px"
+            className="w-full"
+          />
+        </ErrorBoundary>
         
         {/* Slide to start overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/50 to-transparent">

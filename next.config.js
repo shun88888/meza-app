@@ -5,8 +5,17 @@ const nextConfig = {
   
   // 最適化設定
   experimental: {
-    optimizeCss: false, // CSSの最適化を無効化してcritters問題を回避
+    optimizeCss: true, // CSS最適化を有効化
+    webVitalsAttribution: ['CLS', 'LCP'], // Core Web Vitals追跡
+    optimizePackageImports: ['leaflet', 'react-leaflet'], // 外部パッケージ最適化
   },
+  
+  // パフォーマンス最適化
+  swcMinify: true,
+  compress: true,
+  
+  // CSS最適化
+  optimizeFonts: true,
 
   // PWA対応
   async headers() {
@@ -49,13 +58,34 @@ const nextConfig = {
   },
 
   // Webpack設定
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     // ファイルシステムの依存を無効化（Vercel対応）
     config.resolve.fallback = {
       fs: false,
       path: false,
       os: false,
     }
+    
+    // CSS最適化設定
+    if (!isServer) {
+      config.optimization.splitChunks.chunks = 'all'
+      config.optimization.splitChunks.cacheGroups = {
+        ...config.optimization.splitChunks.cacheGroups,
+        styles: {
+          name: 'styles',
+          test: /\.(css|scss|sass)$/,
+          chunks: 'all',
+          enforce: true,
+        },
+        leaflet: {
+          name: 'leaflet',
+          test: /[\\/]node_modules[\\/](leaflet|react-leaflet)[\\/]/,
+          chunks: 'all',
+          priority: 10,
+        }
+      }
+    }
+    
     return config
   },
 }

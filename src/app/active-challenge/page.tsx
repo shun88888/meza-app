@@ -161,7 +161,7 @@ export default function ActiveChallengePage() {
     return R * c
   }
 
-  const getCurrentTime = () => {
+  const getInitialTime = () => {
     const now = new Date()
     return now.toLocaleTimeString('ja-JP', { 
       hour: '2-digit', 
@@ -169,6 +169,22 @@ export default function ActiveChallengePage() {
       second: '2-digit'
     })
   }
+  
+  const [currentTime, setCurrentTime] = useState(getInitialTime())
+  
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      setCurrentTime(now.toLocaleTimeString('ja-JP', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      }))
+    }
+    
+    const interval = setInterval(updateTime, 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   const formatWakeTime = (wakeTimeString: string) => {
     if (!wakeTimeString) {
@@ -226,7 +242,7 @@ export default function ActiveChallengePage() {
         <div className="text-center mb-10">
           <p className="text-base text-gray-400 mb-2">現在の時刻</p>
           <div className="text-5xl font-light">
-            {getCurrentTime()}
+            {currentTime}
           </div>
         </div>
 

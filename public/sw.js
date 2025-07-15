@@ -1,6 +1,6 @@
-const CACHE_NAME = 'meza-app-v1.2.0-mobile';
-const STATIC_CACHE_NAME = 'meza-static-v1.2.0';
-const DYNAMIC_CACHE_NAME = 'meza-dynamic-v1.2.0';
+const CACHE_NAME = 'meza-app-v1.3.0-mobile-optimized';
+const STATIC_CACHE_NAME = 'meza-static-v1.3.0';
+const DYNAMIC_CACHE_NAME = 'meza-dynamic-v1.3.0';
 
 // キャッシュするリソース
 const STATIC_ASSETS = [
@@ -11,7 +11,18 @@ const STATIC_ASSETS = [
   '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
-  '/marker-icon.png'
+  '/marker-icon.png',
+  '/marker-icon-2x.png',
+  '/marker-shadow.png'
+];
+
+// CSS専用キャッシュパターン
+const CSS_CACHE_PATTERNS = [
+  /\/_next\/static\/css\//,
+  /\/css\//,
+  /leaflet.*\.css/,
+  /fonts\.googleapis\.com/,
+  /fonts\.gstatic\.com/
 ];
 
 // API キャッシュ除外リスト
@@ -78,17 +89,27 @@ self.addEventListener('fetch', (event) => {
 
   // モバイル専用キャッシュ戦略
   if (request.method === 'GET') {
+    // CSS ファイルに対する特別な処理
+    const isCSS = CSS_CACHE_PATTERNS.some(pattern => pattern.test(request.url));
+    
     event.respondWith(
       caches.match(request)
         .then((cachedResponse) => {
-          // キャッシュがある場合
+          // CSSファイルの場合はキャッシュ優先
+          if (cachedResponse && isCSS) {
+            // CSSは安定性重視でキャッシュを優先
+            return cachedResponse;
+          }
+          
+          // キャッシュがある場合（CSS以外）
           if (cachedResponse) {
             // ネットワーク優先でバックグラウンド更新
             fetch(request)
               .then((response) => {
                 if (response && response.status === 200) {
                   const responseClone = response.clone();
-                  caches.open(DYNAMIC_CACHE_NAME)
+                  const cacheName = isCSS ? STATIC_CACHE_NAME : DYNAMIC_CACHE_NAME;
+                  caches.open(cacheName)
                     .then((cache) => {
                       cache.put(request, responseClone);
                     });
@@ -108,9 +129,10 @@ self.addEventListener('fetch', (event) => {
                 return response;
               }
 
-              // レスポンスをキャッシュ
+              // レスポンスをキャッシュ（CSSは静的キャッシュ、それ以外は動的キャッシュ）
               const responseToCache = response.clone();
-              caches.open(DYNAMIC_CACHE_NAME)
+              const cacheName = isCSS ? STATIC_CACHE_NAME : DYNAMIC_CACHE_NAME;
+              caches.open(cacheName)
                 .then((cache) => {
                   cache.put(request, responseToCache);
                 });

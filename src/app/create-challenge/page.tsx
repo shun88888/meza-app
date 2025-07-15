@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import SlideToWake from '@/components/SlideToWake'
 import CountdownScreen from '@/components/CountdownScreen'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 // Dynamic import to avoid SSR issues
 const MapPicker = dynamic(() => import('@/components/MapPicker'), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center bg-gray-100 rounded-lg" style={{ height: '612px' }}>
-      <div className="text-gray-500">地図を読み込み中...</div>
+    <div className="loading-container" style={{ height: '612px' }}>
+      <div>地図を読み込み中...</div>
     </div>
   )
 })
@@ -34,35 +35,39 @@ export default function CreateChallengePage() {
   const router = useRouter()
   const [showCountdown, setShowCountdown] = useState(false)
   
-  // Set white theme color and background for create challenge page
+  // Optimize theme changes - only update when needed
   useEffect(() => {
-    if (!showCountdown) {
-      // Set theme color
-      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
-      if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', '#ffffff')
-      } else {
+    try {
+      let metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const themeColor = showCountdown ? '#FED7AA' : '#ffffff'
+      const bgGradient = showCountdown 
+        ? 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)'
+        : 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)'
+      
+      if (!metaThemeColor) {
         const meta = document.createElement('meta')
         meta.name = 'theme-color'
-        meta.content = '#ffffff'
         document.head.appendChild(meta)
+        metaThemeColor = meta
       }
       
-      // Set background gradient for main content
-      document.body.style.background = 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)'
+      metaThemeColor.setAttribute('content', themeColor)
+      document.body.style.background = bgGradient
+      document.documentElement.style.setProperty('--status-bar-gradient', bgGradient)
       
-      // Set status bar gradient to match main background
-      document.documentElement.style.setProperty('--status-bar-gradient', 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)')
-    }
-    
-    return () => {
-      // Reset theme color and background when component unmounts
-      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
-      if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', '#FED7AA')
+      return () => {
+        try {
+          if (metaThemeColor) {
+            metaThemeColor.setAttribute('content', '#FED7AA')
+          }
+          document.body.style.background = 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)'
+          document.documentElement.style.setProperty('--status-bar-gradient', 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)')
+        } catch (error) {
+          console.error('Error resetting theme:', error)
+        }
       }
-      document.body.style.background = 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)'
-      document.documentElement.style.setProperty('--status-bar-gradient', 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)')
+    } catch (error) {
+      console.error('Error setting theme:', error)
     }
   }, [showCountdown])
   
@@ -188,12 +193,20 @@ export default function CreateChallengePage() {
 
       {/* Background Map */}
       <div className="absolute inset-0 z-0">
-        <MapPicker
-          location={challengeData.targetLocation}
-          onLocationSelect={handleLocationSelect}
-          height="100%"
-          className="w-full h-full"
-        />
+        <ErrorBoundary 
+          fallback={
+            <div className="loading-container" style={{ height: '100%' }}>
+              <div>地図コンポーネントのエラーが発生しました</div>
+            </div>
+          }
+        >
+          <MapPicker
+            location={challengeData.targetLocation}
+            onLocationSelect={handleLocationSelect}
+            height="100%"
+            className="w-full h-full"
+          />
+        </ErrorBoundary>
       </div>
 
       {/* Bottom Overlay with Settings */}
