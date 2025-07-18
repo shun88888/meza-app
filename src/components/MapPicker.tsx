@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import dynamic from 'next/dynamic'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import ErrorBoundary from './ErrorBoundary'
+import LeafletCSSLoader from './LeafletCSSLoader'
+import { getFormattedAddressFromCoords } from '@/lib/addressFormatter'
 
 interface Location {
   lat: number
@@ -15,12 +16,31 @@ interface MapPickerProps {
   onLocationSelect: (location: Location) => void
   height?: string
   className?: string
+  homeLocation?: Location | null
+  targetLocation?: Location | null
+  showBothPins?: boolean
+  wakeUpLocation?: Location | null
+  showPins?: boolean
+  readOnly?: boolean
 }
 
-function MapPickerComponent({ location, onLocationSelect, height = '612px', className = '' }: MapPickerProps) {
+export default function MapPicker({ 
+  location, 
+  onLocationSelect, 
+  height = '612px', 
+  className = '', 
+  homeLocation = null,
+  targetLocation = null,
+  showBothPins = false,
+  wakeUpLocation = null,
+  showPins = false,
+  readOnly = false
+}: MapPickerProps) {
   const [isClient, setIsClient] = useState(false)
   const [mapError, setMapError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  const mapRef = useRef<any>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setIsClient(true)
@@ -43,6 +63,18 @@ function MapPickerComponent({ location, onLocationSelect, height = '612px', clas
         setMapError('地図の初期化に失敗しました')
       }
     }
+
+    // クリーンアップ関数でマップを破棄
+    return () => {
+      if (mapRef.current) {
+        try {
+          mapRef.current.remove()
+          mapRef.current = null
+        } catch (error) {
+          console.error('Error cleaning up map:', error)
+        }
+      }
+    }
   }, [retryCount])
 
   const handleRetry = () => {
@@ -62,6 +94,55 @@ function MapPickerComponent({ location, onLocationSelect, height = '612px', clas
       })
     } catch (error) {
       console.error('Error creating leaflet icon:', error)
+      return null
+    }
+  }, [isClient])
+
+  const homeIcon = useMemo(() => {
+    if (!isClient) return null
+    try {
+      const L = require('leaflet')
+      return L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color:#3B82F6;width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><span style="font-size:12px;">🏠</span></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      })
+    } catch (error) {
+      console.error('Error creating home icon:', error)
+      return null
+    }
+  }, [isClient])
+
+  const targetIcon = useMemo(() => {
+    if (!isClient) return null
+    try {
+      const L = require('leaflet')
+      return L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color:#EF4444;width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><span style="font-size:12px;">📍</span></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      })
+    } catch (error) {
+      console.error('Error creating target icon:', error)
+      return null
+    }
+  }, [isClient])
+
+  // SVGアイコンを使用した起床場所マーカー
+  const wakeUpIcon = useMemo(() => {
+    if (!isClient) return null
+    try {
+      const L = require('leaflet')
+      return L.icon({
+        iconUrl: '/marker-target.svg',
+        iconSize: [44, 58],
+        iconAnchor: [22, 58],
+        className: 'leaflet-marker-wakeup'
+      })
+    } catch (error) {
+      console.error('Error creating wake-up icon:', error)
       return null
     }
   }, [isClient])
@@ -102,6 +183,7 @@ function MapPickerComponent({ location, onLocationSelect, height = '612px', clas
   if (!isClient) {
     return (
       <div className="loading-container" style={{ height }}>
+        <LeafletCSSLoader />
         <div>地図を読み込み中...</div>
       </div>
     )
@@ -130,6 +212,7 @@ function MapPickerComponent({ location, onLocationSelect, height = '612px', clas
   }) {
     const map = useMapEvents({
       click(e: any) {
+        if (readOnly) return // 読み取り専用モードではクリックを無効化
         const newLocation = {
           lat: e.latlng.lat,
           lng: e.latlng.lng
@@ -143,9 +226,10 @@ function MapPickerComponent({ location, onLocationSelect, height = '612px', clas
       <Marker 
         position={[position.lat, position.lng]} 
         icon={orangeIcon}
-        draggable={true}
+        draggable={!readOnly} // 読み取り専用モードではドラッグを無効化
         eventHandlers={{
           dragend: (e: any) => {
+            if (readOnly) return
             const marker = e.target
             const position = marker.getLatLng()
             onPositionChange({
@@ -158,26 +242,140 @@ function MapPickerComponent({ location, onLocationSelect, height = '612px', clas
     )
   }
 
+  function WakeUpMapClickHandler({ onLocationSelect }: { 
+    onLocationSelect: (location: Location) => void 
+  }) {
+    const map = useMapEvents({
+      async click(e: any) {
+        if (readOnly) return
+        try {
+          const address = await getFormattedAddressFromCoords(e.latlng.lat, e.latlng.lng)
+          onLocationSelect({
+            lat: e.latlng.lat,
+            lng: e.latlng.lng,
+            address: address
+          })
+          map.setView(e.latlng, map.getZoom())
+        } catch (error) {
+          console.error('住所取得エラー:', error)
+          onLocationSelect({
+            lat: e.latlng.lat,
+            lng: e.latlng.lng
+          })
+          map.setView(e.latlng, map.getZoom())
+        }
+      },
+    })
+
+    return null
+  }
+
   const defaultCenter = [35.6762, 139.6503] // Tokyo
-  const center = location ? [location.lat, location.lng] : defaultCenter
+  
+  // 地図の中心を決定（起床場所がある場合は起床場所を優先）
+  const center = wakeUpLocation ? [wakeUpLocation.lat, wakeUpLocation.lng] :
+                location ? [location.lat, location.lng] : 
+                homeLocation ? [homeLocation.lat, homeLocation.lng] :
+                targetLocation ? [targetLocation.lat, targetLocation.lng] : defaultCenter
 
   try {
     return (
-      <div className={`relative ${className}`} style={{ height }}>
+      <div ref={containerRef} className={`relative ${className}`} style={{ height }}>
+        <LeafletCSSLoader />
         <MapContainer
+          key={`map-${retryCount}-${wakeUpLocation?.lat || 0}-${wakeUpLocation?.lng || 0}`}
           center={center}
           zoom={17}
           style={{ height: '100%', width: '100%' }}
-          className="z-0"
+          className="z-0 leaflet-retina leaflet-fade-anim leaflet-grab leaflet-touch-drag"
           preferCanvas={true}
           zoomControl={false}
-          attributionControl={false}
+          attributionControl={true}
+          ref={mapRef}
+          whenReady={(map: any) => {
+            mapRef.current = map
+            console.log('Map ready successfully')
+          }}
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             errorTileUrl="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
           />
-          <LocationMarker position={location} onPositionChange={onLocationSelect} />
+          
+          {/* 起床場所ピン表示（readOnlyモード用） */}
+          {wakeUpLocation && readOnly && (
+            <Marker 
+              position={[wakeUpLocation.lat, wakeUpLocation.lng]} 
+              icon={wakeUpIcon || targetIcon}
+              key={`wakeup-readonly-${wakeUpLocation.lat}-${wakeUpLocation.lng}`}
+            />
+          )}
+
+          {/* 複数ピン表示時 */}
+          {showBothPins && (
+            <>
+              {/* 睡眠場所マーカー */}
+              {homeLocation && (
+                <Marker 
+                  position={[homeLocation.lat, homeLocation.lng]} 
+                  icon={homeIcon}
+                  key={`home-${homeLocation.lat}-${homeLocation.lng}`}
+                />
+              )}
+              
+              {/* 目標場所マーカー */}
+              {targetLocation && (
+                <Marker 
+                  position={[targetLocation.lat, targetLocation.lng]} 
+                  icon={targetIcon}
+                  key={`target-${targetLocation.lat}-${targetLocation.lng}`}
+                />
+              )}
+              
+              {/* クリック可能なマーカー */}
+              {!readOnly && (
+                <LocationMarker position={location} onPositionChange={onLocationSelect} />
+              )}
+            </>
+          )}
+
+          {/* 通常のマーカー（編集可能時） */}
+          {!showBothPins && !readOnly && !wakeUpLocation && (
+            <LocationMarker position={location} onPositionChange={onLocationSelect} />
+          )}
+
+          {/* 起床場所設定可能なマーカー（編集可能時） */}
+          {!showBothPins && !readOnly && wakeUpLocation && (
+            <>
+              <Marker 
+                position={[wakeUpLocation.lat, wakeUpLocation.lng]} 
+                icon={wakeUpIcon || targetIcon}
+                draggable={true}
+                key={`wakeup-editable-${wakeUpLocation.lat}-${wakeUpLocation.lng}`}
+                eventHandlers={{
+                  dragend: async (e: any) => {
+                    const marker = e.target
+                    const position = marker.getLatLng()
+                    try {
+                      const address = await getFormattedAddressFromCoords(position.lat, position.lng)
+                      onLocationSelect({
+                        lat: position.lat,
+                        lng: position.lng,
+                        address: address
+                      })
+                    } catch (error) {
+                      console.error('住所取得エラー:', error)
+                      onLocationSelect({
+                        lat: position.lat,
+                        lng: position.lng
+                      })
+                    }
+                  }
+                }}
+              />
+              <WakeUpMapClickHandler onLocationSelect={onLocationSelect} />
+            </>
+          )}
         </MapContainer>
       </div>
     )
@@ -191,13 +389,4 @@ function MapPickerComponent({ location, onLocationSelect, height = '612px', clas
   }
 }
 
-const MapPicker = dynamic(() => Promise.resolve(MapPickerComponent), {
-  ssr: false,
-  loading: () => (
-    <div className="loading-container" style={{ height: '400px' }}>
-      <div>地図を読み込み中...</div>
-    </div>
-  )
-})
-
-export default MapPicker 
+ 

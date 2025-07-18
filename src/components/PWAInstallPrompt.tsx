@@ -39,7 +39,7 @@ export default function PWAInstallPrompt({
 
     // PWAインストール完了検出
     const handleAppInstalled = () => {
-      console.log('✅ PWA installed successfully')
+      // PWA installed successfully
       setShowPrompt(false)
       setDeferredPrompt(null)
       onInstalled?.()
@@ -63,7 +63,7 @@ export default function PWAInstallPrompt({
       await deferredPrompt.prompt()
       const { outcome } = await deferredPrompt.userChoice
       
-      console.log(`PWA install prompt outcome: ${outcome}`)
+      // PWA install prompt outcome: ${outcome}
       
       if (outcome === 'accepted') {
         onInstalled?.()

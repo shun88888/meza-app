@@ -1,92 +1,104 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // SSG対応のためのoutputを無効化
-  output: undefined,
+  // Disable strict mode to prevent double renders in development
+  reactStrictMode: false,
   
-  // 最適化設定
-  experimental: {
-    optimizeCss: true, // CSS最適化を有効化
-    webVitalsAttribution: ['CLS', 'LCP'], // Core Web Vitals追跡
-    optimizePackageImports: ['leaflet', 'react-leaflet'], // 外部パッケージ最適化
+  // Improve error handling
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
   },
   
-  // パフォーマンス最適化
-  swcMinify: true,
-  compress: true,
+  // Optimize webpack configuration
+  webpack: (config, { dev, isServer }) => {
+    // Prevent chunk loading errors
+    if (!dev && !isServer) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            priority: 10,
+            reuseExistingChunk: true,
+          },
+          common: {
+            name: 'common',
+            minChunks: 2,
+            priority: 5,
+            reuseExistingChunk: true,
+          },
+        },
+      }
+    }
+    
+    // Improve error handling for development
+    if (dev) {
+      config.devtool = 'eval-source-map'
+    }
+    
+    return config
+  },
   
-  // CSS最適化
+  // PWA configuration
+  experimental: {
+    // Disable app directory features that might cause hydration issues
+    serverComponentsExternalPackages: ['leaflet'],
+  },
+  
+  // Improve build performance
+  swcMinify: true,
+  
+  // Handle environment variables
+  env: {
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  },
+  
+  // Fix font preload optimization
   optimizeFonts: true,
-
-  // PWA対応
-  async headers() {
+  
+  // Disable x-powered-by header
+  poweredByHeader: false,
+  
+  // Optimize images
+  images: {
+    formats: ['image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
+  
+  // Handle redirects
+  async redirects() {
     return [
       {
-        source: '/manifest.json',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-      {
-        source: '/sw.js',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate',
-          },
-        ],
+        source: '/auth/signin',
+        destination: '/login',
+        permanent: false,
       },
     ]
   },
   
-  // 画像最適化
-  images: {
-    domains: ['localhost', 'vercel.app'],
-    unoptimized: false,
-  },
-
-  // TypeScript設定
-  typescript: {
-    ignoreBuildErrors: false,
-  },
-
-  // ESLint設定
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
-
-  // Webpack設定
-  webpack: (config, { isServer }) => {
-    // ファイルシステムの依存を無効化（Vercel対応）
-    config.resolve.fallback = {
-      fs: false,
-      path: false,
-      os: false,
-    }
-    
-    // CSS最適化設定
-    if (!isServer) {
-      config.optimization.splitChunks.chunks = 'all'
-      config.optimization.splitChunks.cacheGroups = {
-        ...config.optimization.splitChunks.cacheGroups,
-        styles: {
-          name: 'styles',
-          test: /\.(css|scss|sass)$/,
-          chunks: 'all',
-          enforce: true,
-        },
-        leaflet: {
-          name: 'leaflet',
-          test: /[\\/]node_modules[\\/](leaflet|react-leaflet)[\\/]/,
-          chunks: 'all',
-          priority: 10,
-        }
-      }
-    }
-    
-    return config
+  // Custom headers for better performance
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+        ],
+      },
+    ]
   },
 }
 

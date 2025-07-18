@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { formatCurrency, formatTime } from '@/lib/utils'
+import { formatAddress } from '@/lib/addressFormatter'
 import type { Challenge } from '@/types'
 
 interface ChallengeCardProps {
@@ -77,10 +78,10 @@ export function ChallengeCard({ challenge }: ChallengeCardProps) {
           </svg>
           <div className="space-y-1">
             <div>
-              <span className="font-medium">出発:</span> {challenge.home_address}
+              <span className="font-medium">出発:</span> {formatAddress(challenge.home_address)}
             </div>
             <div>
-              <span className="font-medium">目標:</span> {challenge.target_address}
+              <span className="font-medium">目標:</span> {formatAddress(challenge.target_address)}
             </div>
           </div>
         </div>

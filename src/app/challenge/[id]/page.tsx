@@ -2,9 +2,21 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import MapPicker from '@/components/MapPicker'
+import dynamic from 'next/dynamic'
 import SlideToWake from '@/components/SlideToWake'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { createClientSideClient, getCurrentUser } from '@/lib/supabase'
+import { formatAddress } from '@/lib/addressFormatter'
+
+// Dynamic import to avoid SSR issues
+const MapPicker = dynamic(() => import('@/components/MapPicker'), {
+  ssr: false,
+  loading: () => (
+    <div className="loading-container" style={{ height: '612px' }}>
+      <div>地図を読み込み中...</div>
+    </div>
+  )
+})
 
 interface Location {
   lat: number
@@ -14,12 +26,16 @@ interface Location {
 
 interface Challenge {
   id: string
-  wakeTime: string
-  penaltyAmount: number
-  homeLocation: Location
-  targetLocation: Location
-  paymentMethod: string
+  target_time: string
+  penalty_amount: number
+  home_latitude: number
+  home_longitude: number
+  home_address: string
+  target_latitude: number
+  target_longitude: number
+  target_address: string
   status: 'pending' | 'active' | 'completed' | 'failed'
+  user_id: string
 }
 
 export default function ChallengePage() {
@@ -31,43 +47,64 @@ export default function ChallengePage() {
 
 
   useEffect(() => {
-    // Mock challenge data for demo
-    const mockChallenge: Challenge = {
-      id: params.id as string,
-      wakeTime: '2025-07-02T08:00:00',
-      penaltyAmount: 300,
-      homeLocation: {
-        lat: 35.3395,
-        lng: 139.6342,
-        address: '神奈川県横浜市　金沢区泥亀一丁目'
-      },
-      targetLocation: {
-        lat: 35.3395,
-        lng: 139.6342,
-        address: '神奈川県横浜市　金沢区泥亀一丁目'
-      },
-      paymentMethod: '●●●● ●●●● ●●●● 1071',
-      status: 'pending'
+    const fetchChallenge = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (!user) {
+          router.push('/auth/signin')
+          return
+        }
+
+        const supabase = createClientSideClient()
+        const { data: challenge, error } = await supabase
+          .from('challenges')
+          .select('*')
+          .eq('id', params.id)
+          .eq('user_id', user.id)
+          .single()
+
+        if (error) {
+          console.error('Error fetching challenge:', error)
+          alert('チャレンジの取得に失敗しました')
+          router.push('/')
+          return
+        }
+
+        setChallenge(challenge)
+      } catch (error) {
+        console.error('Error:', error)
+        alert('エラーが発生しました')
+        router.push('/')
+      } finally {
+        setLoading(false)
+      }
     }
-    
-    setChallenge(mockChallenge)
-    setLoading(false)
-  }, [params.id])
+
+    fetchChallenge()
+  }, [params.id, router])
 
   const handleStartChallenge = async () => {
     if (!challenge) return
     
     try {
+      const supabase = createClientSideClient()
+      const { error } = await supabase
+        .from('challenges')
+        .update({ 
+          status: 'active',
+          started_at: new Date().toISOString()
+        })
+        .eq('id', challenge.id)
+
+      if (error) {
+        console.error('Error starting challenge:', error)
+        alert('チャレンジの開始に失敗しました')
+        return
+      }
+
       setChallenge(prev => prev ? { ...prev, status: 'active' } : null)
       
-      // Store challenge data for persistence
-      localStorage.setItem('activeChallenge', JSON.stringify({
-        ...challenge,
-        startTime: new Date().toISOString(),
-        startLocation: challenge.homeLocation
-      }))
-      
-      // Navigate to active challenge instead of complete
+      // Navigate to active challenge
       router.push('/active-challenge')
     } catch (error) {
       console.error('Error starting challenge:', error)
@@ -126,7 +163,11 @@ export default function ChallengePage() {
           }
         >
           <MapPicker
-            location={challenge.targetLocation}
+            location={{
+              lat: challenge.target_latitude,
+              lng: challenge.target_longitude,
+              address: challenge.target_address
+            }}
             onLocationSelect={() => {}} // Read-only for this view
             height="612px"
             className="w-full"
@@ -151,7 +192,7 @@ export default function ChallengePage() {
           <div className="flex items-center h-12 border-b border-gray-200">
             <div className="w-16 text-xs text-gray-500 tracking-wide">起床場所</div>
             <div className="flex-1 text-sm text-gray-800">
-              {challenge.homeLocation.address}
+              {formatAddress(challenge.home_address)}
             </div>
           </div>
 
@@ -159,7 +200,7 @@ export default function ChallengePage() {
           <div className="flex items-center h-12 border-b border-gray-200">
             <div className="w-16 text-xs text-gray-500 tracking-wide">目覚時間</div>
             <div className="flex-1 text-sm text-gray-800">
-              {formatDate(challenge.wakeTime)}
+              {formatDate(challenge.target_time)}
             </div>
           </div>
 
@@ -167,7 +208,7 @@ export default function ChallengePage() {
           <div className="flex items-center h-12 border-b border-gray-200">
             <div className="w-16 text-xs text-gray-500 tracking-wide">覚悟金額</div>
             <div className="flex-1 text-sm text-gray-800">
-              ￥{challenge.penaltyAmount.toLocaleString()}
+              ￥{challenge.penalty_amount.toLocaleString()}
             </div>
           </div>
 
@@ -182,7 +223,7 @@ export default function ChallengePage() {
                   <path fill="#171E6C" d="M2.788 5.914A7.201 7.201 0 001 5.237l.028-.125h2.737c.371.013.672.125.77.519l.595 2.836.182.854 1.666-4.21h1.799l-2.674 6.167H4.304L2.788 5.914zm7.312 5.37H8.399l1.064-6.172h1.7L10.1 11.284zm6.167-6.021l-.232 1.333-.153-.066a3.054 3.054 0 00-1.268-.236c-.671 0-.972.269-.98.531 0 .29.365.48.96.762.98.44 1.435.979 1.428 1.681-.014 1.28-1.176 2.108-2.96 2.108-.764-.007-1.5-.158-1.898-.328l.238-1.386.224.099c.553.23.917.328 1.596.328.49 0 1.015-.19 1.022-.604 0-.27-.224-.466-.882-.769-.644-.295-1.505-.788-1.491-1.674C11.878 5.84 13.06 5 14.74 5c.658 0 1.19.138 1.526.263zm2.26 3.834h1.415c-.07-.308-.392-1.786-.392-1.786l-.12-.531c-.083.23-.23.604-.223.59l-.68 1.727zm2.1-3.985L22 11.284h-1.575s-.154-.71-.203-.926h-2.184l-.357.926h-1.785l2.527-5.66c.175-.4.483-.512.889-.512h1.316z"/>
                 </g>
               </svg>
-              {challenge.paymentMethod}
+              登録済みのカード
             </div>
           </div>
 

@@ -1,69 +1,95 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { SUPABASE_CONFIG, IS_DEMO_MODE } from './supabase-config'
+import { SUPABASE_CONFIG } from './supabase-config'
 
-// Lazy client creation to avoid initial load overhead
-let clientSideClient: any = null
-let adminClient: any = null
+// Client-side Supabase client singleton
+let clientSideInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
 
-// Client-side Supabase client (for use in client components)
 export const createClientSideClient = () => {
-  if (!clientSideClient) {
-    try {
-      clientSideClient = createClientComponentClient<Database>()
-    } catch (error) {
-      console.log('Supabase client creation failed, using demo mode')
-      return null
-    }
+  if (typeof window === 'undefined') {
+    // Server-side: create new instance each time
+    return createClientComponentClient<Database>()
   }
-  return clientSideClient
+  
+  // Client-side: use singleton with storage key
+  if (!clientSideInstance) {
+    clientSideInstance = createClientComponentClient<Database>({
+      supabaseKey: 'meza-app-client'
+    })
+  }
+  return clientSideInstance
 }
 
-// Admin client (for server actions and API routes) - only create when needed
-export const getSupabaseClient = () => {
-  if (!adminClient) {
-    if (IS_DEMO_MODE) {
-      console.log('デモモードが有効です')
-      return null
-    }
-    
-    try {
-      adminClient = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
-        auth: {
-          persistSession: false
-        }
-      })
-      console.log('✅ Supabaseクライアント接続成功')
-    } catch (error) {
-      console.log('❌ Supabaseクライアント作成失敗:', error)
-      return null
-    }
-  }
-  return adminClient
-}
-
-// Compatibility export - only create when actually used
-export const supabase = new Proxy({}, {
-  get(target, prop) {
-    const client = getSupabaseClient()
-    return client ? client[prop] : null
+// Admin client (for server actions requiring elevated permissions)
+export const supabase = createClient<Database>(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
   }
 })
 
+// Helper function to create user profile
+export async function createUserProfile(userId: string, email: string) {
+  const supabase = createClientSideClient()
+  if (!supabase) return { error: { message: 'Supabase not available' } }
+
+  try {
+    // Check if profile already exists
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single()
+
+    if (existingProfile) {
+      return { error: null }
+    }
+
+    // Create profile
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: userId,
+        email: email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+
+    if (profileError) {
+      console.error('Profile creation error:', profileError)
+      return { error: profileError }
+    }
+
+    // Create user settings
+    const { error: settingsError } = await supabase
+      .from('user_settings')
+      .insert({
+        user_id: userId,
+        push_notifications_enabled: false,
+        reminder_enabled: true,
+        reminder_minutes_before: 10,
+        theme: 'light',
+        timezone: 'Asia/Tokyo'
+      })
+
+    if (settingsError) {
+      console.error('User settings creation error:', settingsError)
+      // Don't return error for settings, profile creation is more important
+    }
+
+    return { error: null }
+  } catch (error) {
+    console.error('Error creating user profile:', error)
+    return { error: error as any }
+  }
+}
+
 // Utility functions for client-side usage
 export async function getCurrentUser() {
-  // デモモード用のローカルストレージチェック
-  if (typeof window !== 'undefined') {
-    const demoUser = localStorage.getItem('demo-user')
-    if (demoUser) {
-      return JSON.parse(demoUser)
-    }
-  }
-
   const supabase = createClientSideClient()
   if (!supabase) return null
-
   try {
     const { data: { session } } = await supabase.auth.getSession()
     return session?.user || null
@@ -74,14 +100,8 @@ export async function getCurrentUser() {
 }
 
 export async function signOut() {
-  // デモモードのクリーンアップ
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('demo-user')
-  }
-
   const supabase = createClientSideClient()
   if (!supabase) return
-
   try {
     await supabase.auth.signOut()
   } catch (error) {
@@ -110,7 +130,27 @@ export async function signUpWithEmail(email: string, password: string) {
   }
 
   try {
-    return await supabase.auth.signUp({ email, password })
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`
+      }
+    })
+
+    if (error) {
+      return { error }
+    }
+
+    // If signup was successful and user is confirmed, create profile immediately
+    if (data?.user && data.user.email_confirmed_at) {
+      const profileResult = await createUserProfile(data.user.id, data.user.email || email)
+      if (profileResult.error) {
+        console.error('Profile creation failed:', profileResult.error)
+      }
+    }
+
+    return { data, error: null }
   } catch (error) {
     console.log('Supabase signUp failed')
     return { error: { message: 'サインアップに失敗しました。' } }

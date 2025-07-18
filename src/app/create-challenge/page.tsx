@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import SlideToWake from '@/components/SlideToWake'
 import CountdownScreen from '@/components/CountdownScreen'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { getFormattedAddressFromCoords, formatAddress } from '@/lib/addressFormatter'
 
-// Dynamic import to avoid SSR issues
-const MapPicker = dynamic(() => import('@/components/MapPicker'), {
+// Dynamic import to avoid SSR issues - use direct import path
+const MapPicker = dynamic(() => import('../../components/MapPicker'), {
   ssr: false,
   loading: () => (
     <div className="loading-container" style={{ height: '612px' }}>
@@ -26,13 +27,13 @@ interface Location {
 interface ChallengeData {
   wakeTime: string
   penaltyAmount: number
-  homeLocation: Location | null
-  targetLocation: Location | null
+  wakeUpLocation: Location | null
   paymentMethod: string
 }
 
 export default function CreateChallengePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showCountdown, setShowCountdown] = useState(false)
   
   // Optimize theme changes - only update when needed
@@ -84,19 +85,200 @@ export default function CreateChallengePage() {
   const [challengeData, setChallengeData] = useState<ChallengeData>({
     wakeTime: getDefaultWakeTime(),
     penaltyAmount: 300,
-    homeLocation: null,
-    targetLocation: null,
+    wakeUpLocation: null,
     paymentMethod: '●●●● ●●●● ●●●● 1071'
   })
+
+  // 現在地を取得して初期位置に設定
+  useEffect(() => {
+    if (typeof window === 'undefined') return // SSR時はスキップ
+
+    const setDefaultLocation = () => {
+      setChallengeData(prev => ({
+        ...prev,
+        wakeUpLocation: {
+          lat: 35.6812,
+          lng: 139.7671,
+          address: '東京駅周辺（デフォルト位置）'
+        }
+      }))
+    }
+
+    // URLパラメータから起床場所が設定されている場合はスキップ
+    try {
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('wakeUpLat') && urlParams.get('wakeUpLng')) {
+        return
+      }
+    } catch (error) {
+      console.error('URLパラメータ取得エラー:', error)
+    }
+
+    // if (challengeData.wakeUpLocation) return // デバッグのため一時的にコメントアウト
+
+    if (!navigator?.geolocation) {
+      console.log('位置情報がサポートされていません')
+      setDefaultLocation()
+      return
+    }
+
+    console.log('現在地を取得中...')
+    
+    // 位置情報取得の実行
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          console.log('現在地取得成功:', position.coords.latitude, position.coords.longitude)
+          
+          // 即座に座標を設定（住所は後で取得）
+          setChallengeData(prev => ({
+            ...prev,
+            wakeUpLocation: {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              address: '住所を取得中...'
+            }
+          }))
+          
+          // 住所を非同期で取得して更新
+          getFormattedAddressFromCoords(position.coords.latitude, position.coords.longitude)
+            .then(address => {
+              console.log('フォーマット住所取得成功:', address)
+              setChallengeData(prev => ({
+                ...prev,
+                wakeUpLocation: {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                  address: address
+                }
+              }))
+            })
+            .catch(error => {
+              console.error('住所取得エラー:', error)
+              setChallengeData(prev => ({
+                ...prev,
+                wakeUpLocation: {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                  address: `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`
+                }
+              }))
+            })
+        } catch (error) {
+          console.error('位置情報処理エラー:', error)
+          setDefaultLocation()
+        }
+      },
+      (error) => {
+        console.error('現在地取得エラー:', error.code, error.message)
+        let errorMessage = '東京駅周辺'
+        switch (error.code) {
+          case 1: // PERMISSION_DENIED
+            errorMessage = '東京駅周辺（位置情報許可をしてください）'
+            break
+          case 2: // POSITION_UNAVAILABLE
+            errorMessage = '東京駅周辺（位置情報取得不可）'
+            break
+          case 3: // TIMEOUT
+            errorMessage = '東京駅周辺（位置情報取得タイムアウト）'
+            break
+          default:
+            errorMessage = '東京駅周辺（位置情報取得失敗）'
+        }
+        
+        setChallengeData(prev => ({
+          ...prev,
+          wakeUpLocation: {
+            lat: 35.6812,
+            lng: 139.7671,
+            address: errorMessage
+          }
+        }))
+      },
+      {
+        enableHighAccuracy: false, // より高速な取得のためfalseに変更
+        timeout: 5000, // タイムアウトを5秒に短縮
+        maximumAge: 300000 // 5分間キャッシュを延長
+      }
+    )
+  }, [])
+
+  // URLパラメータから設定値を更新
+  useEffect(() => {
+    // 覚悟金額の更新
+    const penaltyAmount = searchParams.get('penaltyAmount')
+    if (penaltyAmount) {
+      setChallengeData(prev => ({
+        ...prev,
+        penaltyAmount: parseInt(penaltyAmount)
+      }))
+    }
+
+    // 目覚時間の更新
+    const wakeTime = searchParams.get('wakeTime')
+    if (wakeTime) {
+      setChallengeData(prev => ({
+        ...prev,
+        wakeTime: decodeURIComponent(wakeTime)
+      }))
+    }
+
+    // 起床場所情報の更新
+    const wakeUpLat = searchParams.get('wakeUpLat')
+    const wakeUpLng = searchParams.get('wakeUpLng')
+    const wakeUpAddress = searchParams.get('wakeUpAddress')
+
+    if (wakeUpLat && wakeUpLng) {
+      setChallengeData(prev => ({
+        ...prev,
+        wakeUpLocation: {
+          lat: parseFloat(wakeUpLat),
+          lng: parseFloat(wakeUpLng),
+          address: wakeUpAddress || undefined
+        }
+      }))
+    }
+
+    // 支払い方法の更新
+    const paymentMethodId = searchParams.get('paymentMethodId')
+    if (paymentMethodId) {
+      setChallengeData(prev => ({
+        ...prev,
+        paymentMethod: '登録済みのカード'
+      }))
+    }
+
+    // URLをクリアして、戻るボタンが期待通りに動作するようにする
+    if (searchParams.toString()) {
+      router.replace('/create-challenge', { scroll: false })
+    }
+  }, [searchParams, router])
 
   const handleLocationSelect = (location: Location) => {
     setChallengeData(prev => ({
       ...prev,
-      targetLocation: location
+      wakeUpLocation: location
     }))
   }
 
-  const handleSlideComplete = () => {
+  const handleSlideComplete = async () => {
+    // Check if user has payment method registered
+    try {
+      const { checkAutoCharge } = await import('@/lib/stripe')
+      const autoChargeCheck = await checkAutoCharge('mock-user-id') // Replace with actual user ID
+      
+      if (!autoChargeCheck.canAutoCharge) {
+        // Show alert for missing payment method
+        alert('チャレンジを開始するには、クレジットカードの登録が必要です。プロフィール画面からカード情報を登録してください。')
+        router.push('/profile/payment-methods')
+        return
+      }
+    } catch (error) {
+      console.error('Failed to check payment method:', error)
+      alert('決済情報の確認に失敗しました。もう一度お試しください。')
+      return
+    }
+
     // Save start location for later use
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -193,20 +375,31 @@ export default function CreateChallengePage() {
 
       {/* Background Map */}
       <div className="absolute inset-0 z-0">
-        <ErrorBoundary 
-          fallback={
-            <div className="loading-container" style={{ height: '100%' }}>
-              <div>地図コンポーネントのエラーが発生しました</div>
-            </div>
+        <style type="text/css">{`
+          #setting-location-map .leaflet-container {
+            width: 100%;
+            height: 612px;
           }
-        >
-          <MapPicker
-            location={challengeData.targetLocation}
-            onLocationSelect={handleLocationSelect}
-            height="100%"
-            className="w-full h-full"
-          />
-        </ErrorBoundary>
+        `}</style>
+        <div id="setting-location-map">
+          <ErrorBoundary 
+            fallback={
+              <div className="loading-container" style={{ height: '612px' }}>
+                <div>地図コンポーネントのエラーが発生しました</div>
+              </div>
+            }
+          >
+            <MapPicker
+              location={challengeData.wakeUpLocation}
+              onLocationSelect={handleLocationSelect}
+              height="612px"
+              className="w-full"
+              wakeUpLocation={challengeData.wakeUpLocation}
+              showPins={true}
+              readOnly={false}
+            />
+          </ErrorBoundary>
+        </div>
       </div>
 
       {/* Bottom Overlay with Settings */}
@@ -216,31 +409,38 @@ export default function CreateChallengePage() {
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-4">
             
             {/* 起床場所 */}
-            <div className="flex items-center h-12 px-4 border-b border-gray-100">
+            <button 
+              className="w-full flex items-center h-12 px-4 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-50"
+              onClick={() => {
+                const params = new URLSearchParams()
+                if (challengeData.wakeUpLocation) {
+                  params.set('wakeUpLat', challengeData.wakeUpLocation.lat.toString())
+                  params.set('wakeUpLng', challengeData.wakeUpLocation.lng.toString())
+                  if (challengeData.wakeUpLocation.address) {
+                    params.set('wakeUpAddress', challengeData.wakeUpLocation.address)
+                  }
+                }
+                router.push(`/create-challenge/location?${params.toString()}`)
+              }}
+            >
               <div className="w-16 text-xs text-gray-500 tracking-wide">起床場所</div>
-              <div className="flex-1 text-sm text-gray-800">
-                神奈川県横浜市　金沢区泥亀一丁目
+              <div className="flex-1 text-sm text-left">
+                <span className={challengeData.wakeUpLocation?.address && !challengeData.wakeUpLocation.address.includes('取得中') ? 'text-gray-800' : 'text-gray-400'}>
+                  {challengeData.wakeUpLocation?.address ? formatAddress(challengeData.wakeUpLocation.address) : '現在地を取得中...'}
+                </span>
               </div>
-            </div>
+              <div className="px-3">
+                <svg width="8" height="10" viewBox="0 0 8 10" className="text-gray-400">
+                  <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M1 2l3 3-3 3"/>
+                </svg>
+              </div>
+            </button>
 
             {/* 目覚時間 */}
             <button 
               className="w-full flex items-center h-12 px-4 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-50"
               onClick={() => {
-                // Cycle through different wake times
-                const currentDate = new Date(challengeData.wakeTime)
-                const currentHour = currentDate.getHours()
-                const hours = [6, 7, 8, 9, 10]
-                const currentIndex = hours.indexOf(currentHour)
-                const nextIndex = (currentIndex + 1) % hours.length
-                
-                const newWakeTime = new Date(currentDate)
-                newWakeTime.setHours(hours[nextIndex], 0, 0, 0)
-                
-                setChallengeData(prev => ({
-                  ...prev,
-                  wakeTime: newWakeTime.toISOString()
-                }))
+                router.push(`/create-challenge/time?current=${encodeURIComponent(challengeData.wakeTime)}`)
               }}
             >
               <div className="w-16 text-xs text-gray-500 tracking-wide">目覚時間</div>
@@ -258,13 +458,7 @@ export default function CreateChallengePage() {
             <button 
               className="w-full flex items-center h-12 px-4 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-50"
               onClick={() => {
-                const amounts = [100, 300, 500, 1000, 3000, 5000]
-                const currentIndex = amounts.indexOf(challengeData.penaltyAmount)
-                const nextIndex = (currentIndex + 1) % amounts.length
-                setChallengeData(prev => ({
-                  ...prev,
-                  penaltyAmount: amounts[nextIndex]
-                }))
+                router.push(`/create-challenge/penalty?current=${challengeData.penaltyAmount}`)
               }}
             >
               <div className="w-16 text-xs text-gray-500 tracking-wide">覚悟金額</div>
@@ -279,7 +473,12 @@ export default function CreateChallengePage() {
             </button>
 
             {/* 支払方法 */}
-            <button className="w-full flex items-center h-12 px-4 hover:bg-gray-50 transition-colors duration-50">
+            <button 
+              className="w-full flex items-center h-12 px-4 hover:bg-gray-50 transition-colors duration-50"
+              onClick={() => {
+                router.push('/create-challenge/payment')
+              }}
+            >
               <div className="w-16 text-xs text-gray-500 tracking-wide">支払方法</div>
               <div className="flex-1 flex items-center text-sm text-gray-800">
                 {/* Visa icon */}

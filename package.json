@@ -13,7 +13,18 @@
     "qr": "node mobile-qr.js",
     "install:mobile": "npm install && npm run qr",
     "clean": "rm -rf .next && rm -rf node_modules/.cache",
-    "dev:clean": "npm run clean && npm run dev"
+    "dev:clean": "npm run clean && npm run dev",
+    "setup": "node scripts/setup-all.js",
+    "setup:db": "node scripts/setup-database.js",
+    "setup:vapid": "node scripts/generate-vapid-keys.js",
+    "setup:stripe": "node scripts/setup-stripe.js",
+    "setup:complete": "npm run setup && echo '✅ Setup complete! Copy env-template.txt to .env.local and run npm run dev'",
+    "stripe:setup": "node scripts/setup-stripe.js",
+    "stripe:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe",
+    "stripe:test": "npm run stripe:setup && npm run dev",
+    "webhook:setup": "node scripts/setup-webhook.js",
+    "webhook:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe",
+    "webhook:test": "npm run webhook:setup && npm run dev"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.0.2",
@@ -37,13 +48,16 @@
     "react-swipeable": "^7.0.2",
     "stripe": "^14.9.0",
     "tailwind-merge": "^2.1.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "vercel": "^44.4.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.8",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/web-push": "^3.6.3",
     "autoprefixer": "^10.0.1",
     "critters": "^0.0.23",
     "eslint": "^8",

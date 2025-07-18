@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import SlideToWake, { SlideToWakeRef } from '@/components/SlideToWake'
+import { createClientSideClient, getCurrentUser } from '@/lib/supabase'
 
 interface ChallengeData {
+  id: string
   wakeTime: string
   penaltyAmount: number
   startLocation: { lat: number; lng: number }
@@ -12,10 +14,18 @@ interface ChallengeData {
 }
 
 export default function ActiveChallengePage() {
-  const router = useRouter()
-  const [isCheckingLocation, setIsCheckingLocation] = useState(false)
   const [challengeData, setChallengeData] = useState<ChallengeData | null>(null)
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [isTracking, setIsTracking] = useState(false)
+  const [showCountdown, setShowCountdown] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+  const router = useRouter()
   const slideToWakeRef = useRef<SlideToWakeRef>(null)
+  
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
   
   // Set dark slate theme color and background for active challenge page
   useEffect(() => {
@@ -50,32 +60,54 @@ export default function ActiveChallengePage() {
 
 
   useEffect(() => {
-    // Load challenge data from localStorage
-    const storedChallenge = localStorage.getItem('activeChallenge')
-    if (storedChallenge) {
+    const fetchActiveChallenge = async () => {
       try {
-        const parsedData = JSON.parse(storedChallenge)
-        // Ensure wakeTime has a default value if not set
-        if (!parsedData.wakeTime) {
-          const defaultWakeTime = new Date()
-          defaultWakeTime.setHours(8, 0, 0, 0)
-          parsedData.wakeTime = defaultWakeTime.toISOString()
+        const user = await getCurrentUser()
+        if (!user) {
+          router.push('/auth/signin')
+          return
         }
-        setChallengeData(parsedData)
+
+        const supabase = createClientSideClient()
+        const { data: challenge, error } = await supabase
+          .from('challenges')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .single()
+
+        if (error || !challenge) {
+          // No active challenge, redirect to home
+          router.push('/')
+          return
+        }
+
+        // Convert to UI format
+        const challengeData: ChallengeData = {
+          id: challenge.id,
+          wakeTime: challenge.target_time,
+          penaltyAmount: challenge.penalty_amount,
+          startLocation: {
+            lat: challenge.home_lat || challenge.home_latitude,
+            lng: challenge.home_lng || challenge.home_longitude
+          },
+          startTime: challenge.started_at || new Date().toISOString()
+        }
+
+        setChallengeData(challengeData)
       } catch (error) {
-        console.error('Error parsing challenge data:', error)
+        console.error('Error fetching active challenge:', error)
         router.push('/')
       }
-    } else {
-      // No active challenge, redirect to home
-      router.push('/')
     }
+
+    fetchActiveChallenge()
   }, [router])
 
   const handleDissolveChallenge = async () => {
     if (!challengeData) return
     
-    setIsCheckingLocation(true)
+    setIsTracking(true)
     
     try {
       // Get current location
@@ -101,16 +133,72 @@ export default function ActiveChallengePage() {
       )
 
       if (distance >= 100) {
-        // Success: Clear the active challenge and go home
-        localStorage.removeItem('activeChallenge')
-        alert(`チャレンジ成功！${Math.round(distance)}m移動しました。罰金は発生しません。`)
-        router.push('/')
+        // Success: Complete the challenge
+        try {
+          const completeResponse = await fetch(`/api/challenges/${challengeData.id}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              current_lat: currentLocation.lat,
+              current_lng: currentLocation.lng,
+              current_address: '現在位置',
+              distance_to_target: distance,
+              is_success: true
+            })
+          })
+          
+          if (completeResponse.ok) {
+            alert(`チャレンジ成功！${Math.round(distance)}m移動しました。罰金は発生しません。`)
+            router.push('/')
+          } else {
+            throw new Error('Failed to complete challenge')
+          }
+        } catch (error) {
+          console.error('Error completing challenge:', error)
+          alert('チャレンジ完了の処理に失敗しました。')
+        }
       } else {
-        // Failed: Stay on the challenge screen, don't clear localStorage
-        alert(`移動距離が不足しています（${Math.round(distance)}m）。100m以上移動する必要があります。チャレンジは継続中です。`)
-        // Reset the slide component to initial state
-        slideToWakeRef.current?.reset()
-        // チャレンジは継続、画面もそのまま
+        // Failed: Check if this is past wake time, if so trigger completion as failed
+        const wakeTime = new Date(challengeData.wakeTime)
+        const currentTime = new Date()
+        
+        if (currentTime > wakeTime) {
+          // Challenge failed - complete as failed
+          try {
+            const completeResponse = await fetch(`/api/challenges/${challengeData.id}/complete`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                current_lat: currentLocation.lat,
+                current_lng: currentLocation.lng,
+                current_address: '現在位置',
+                distance_to_target: distance,
+                is_success: false
+              })
+            })
+            
+            if (completeResponse.ok) {
+              alert(`チャレンジ失敗：移動距離不足（${Math.round(distance)}m）\nペナルティ決済画面に移動します。`)
+              router.push(`/challenge/${challengeData.id}/payment`)
+            } else {
+              throw new Error('Failed to complete challenge')
+            }
+          } catch (error) {
+            console.error('Error completing challenge:', error)
+            alert('チャレンジ完了処理でエラーが発生しました。手動で決済してください。')
+            router.push(`/challenge/${challengeData.id}/payment`)
+          }
+        } else {
+          // Still within wake time, continue challenge
+          alert(`移動距離が不足しています（${Math.round(distance)}m）。100m以上移動する必要があります。チャレンジは継続中です。`)
+          // Reset the slide component to initial state
+          slideToWakeRef.current?.reset()
+          // チャレンジは継続、画面もそのまま
+        }
       }
     } catch (error) {
       console.error('Location error:', error)
@@ -133,7 +221,6 @@ export default function ActiveChallengePage() {
       }
       
       if (confirm(`${errorMessage}\n\nチャレンジを終了しますか？`)) {
-        localStorage.removeItem('activeChallenge')
         router.push('/')
       } else {
         // Reset the slide component to initial state when user cancels
@@ -141,7 +228,7 @@ export default function ActiveChallengePage() {
       }
       // キャンセルした場合はチャレンジ継続
     } finally {
-      setIsCheckingLocation(false)
+      setIsTracking(false)
     }
   }
 
@@ -162,6 +249,7 @@ export default function ActiveChallengePage() {
   }
 
   const getInitialTime = () => {
+    if (!isClient) return '00:00:00'
     const now = new Date()
     return now.toLocaleTimeString('ja-JP', { 
       hour: '2-digit', 
@@ -173,6 +261,8 @@ export default function ActiveChallengePage() {
   const [currentTime, setCurrentTime] = useState(getInitialTime())
   
   useEffect(() => {
+    if (!isClient) return
+    
     const updateTime = () => {
       const now = new Date()
       setCurrentTime(now.toLocaleTimeString('ja-JP', { 
@@ -184,7 +274,7 @@ export default function ActiveChallengePage() {
     
     const interval = setInterval(updateTime, 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [isClient])
 
   const formatWakeTime = (wakeTimeString: string) => {
     if (!wakeTimeString) {
@@ -274,13 +364,13 @@ export default function ActiveChallengePage() {
         <SlideToWake
           ref={slideToWakeRef}
           onSlideComplete={handleDissolveChallenge}
-          disabled={isCheckingLocation}
+          disabled={isTracking}
           className="w-full"
           text="スライドで解除"
           completedText="解除完了!"
         />
         
-        {isCheckingLocation && (
+        {isTracking && (
           <div className="mt-4 text-center opacity-0 animate-[fadeIn_0.05s_ease-out_forwards]">
             <div className="inline-flex items-center text-[#FFAD2F] bg-slate-800/50 rounded-lg px-4 py-2">
               <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
