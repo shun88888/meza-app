@@ -117,7 +117,8 @@ export default function RootLayout({
     <html lang="ja" className={inter.variable}>
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#FED7AA" />
+        <meta name="theme-color" content="#FFFFFF" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body className={`${inter.className} antialiased min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
         <ErrorBoundary>

@@ -3,25 +3,38 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { SUPABASE_CONFIG, isSupabaseConfigured } from './supabase-config'
 
-// Client-side Supabase client singleton
-let clientSideInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
+// Global singleton instance
+let globalSupabaseInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
 
-export const createClientSideClient = () => {
+// Initialize singleton only once
+const initSupabaseClient = () => {
   if (!isSupabaseConfigured()) {
     console.warn('Supabase is not configured properly. Running in demo mode.')
     return null
   }
 
   if (typeof window === 'undefined') {
-    // Server-side: create new instance each time
+    // Server-side: always create new instance
     return createClientComponentClient<Database>()
   }
-  
-  // Client-side: use singleton to prevent multiple instances
-  if (!clientSideInstance) {
-    clientSideInstance = createClientComponentClient<Database>()
+
+  // Client-side: use global singleton
+  if (!globalSupabaseInstance) {
+    globalSupabaseInstance = createClientComponentClient<Database>()
+    
+    // Add cleanup on page unload to prevent memory leaks
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => {
+        globalSupabaseInstance = null
+      })
+    }
   }
-  return clientSideInstance
+  
+  return globalSupabaseInstance
+}
+
+export const createClientSideClient = () => {
+  return initSupabaseClient()
 }
 
 // Admin client (for server actions requiring elevated permissions)

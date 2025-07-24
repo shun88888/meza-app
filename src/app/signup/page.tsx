@@ -1,13 +1,13 @@
 'use client'
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClientSideClient } from '@/lib/supabase'
 
 export default function SignupPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClientSideClient()
   const [formData, setFormData] = useState({
     email: '',
     password: '',

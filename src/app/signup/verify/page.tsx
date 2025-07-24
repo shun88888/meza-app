@@ -1,13 +1,13 @@
 'use client'
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClientSideClient } from '@/lib/supabase'
 
 export default function VerifyPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClientSideClient()
   const [email, setEmail] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)

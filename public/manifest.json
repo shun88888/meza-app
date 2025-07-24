@@ -9,7 +9,7 @@
     "minimal-ui"
   ],
   "background_color": "#ffffff",
-  "theme_color": "#FFC700",
+  "theme_color": "#FFFFFF",
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "ja",

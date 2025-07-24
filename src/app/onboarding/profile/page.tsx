@@ -1,12 +1,12 @@
 'use client'
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClientSideClient } from '@/lib/supabase'
 
 export default function OnboardingProfilePage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClientSideClient()
   const [formData, setFormData] = useState({
     displayName: '',
     goal: '',
