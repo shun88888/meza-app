@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react'
 import { Clock } from '@/components/ui/clock'
 
 interface StatusCardProps {
-  nextAlarm?: string
   className?: string
 }
 
-export default function StatusCard({ nextAlarm, className = '' }: StatusCardProps) {
+export default function StatusCard({ className = '' }: StatusCardProps) {
   const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
 
@@ -43,13 +42,6 @@ export default function StatusCard({ nextAlarm, className = '' }: StatusCardProp
             Loading...
           </div>
         </div>
-        
-        {nextAlarm && (
-          <div className="text-center pt-3 border-t border-white/10">
-            <div className="text-gray-600 dark:text-gray-400 text-xs mb-1">NEXT ALARM</div>
-            <div className="text-black dark:text-white text-base font-medium">{nextAlarm}</div>
-          </div>
-        )}
       </div>
     )
   }
@@ -69,13 +61,6 @@ export default function StatusCard({ nextAlarm, className = '' }: StatusCardProp
           })}
         </div>
       </div>
-      
-      {nextAlarm && (
-        <div className="text-center pt-3 border-t border-white/10">
-          <div className="text-gray-600 dark:text-gray-400 text-xs mb-1">NEXT ALARM</div>
-          <div className="text-black dark:text-white text-base font-medium">{nextAlarm}</div>
-        </div>
-      )}
     </div>
   )
 }

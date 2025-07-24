@@ -67,13 +67,12 @@ export default function HomePage() {
           {/* Status Card */}
           <div className="w-full mb-6">
             <StatusCard 
-              nextAlarm={formatTime(wakeTime.hours, wakeTime.minutes)}
               className="w-full"
             />
           </div>
 
           {/* Wake Time Setting */}
-          <div className="w-full">
+          <div className="w-full mb-8">
             <div className="bg-white/10 dark:bg-black/10 backdrop-blur-md rounded-3xl p-6 border border-white/20 shadow-lg">
               <div className="text-center mb-6">
                 <h2 className="text-xl font-semibold mb-3 text-black dark:text-white">起床時刻設定</h2>
@@ -134,23 +133,26 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+
+          {/* Start Button */}
+          <div className="w-full">
+            <button
+              onClick={handleStart}
+              className="w-full h-14 text-lg font-semibold shadow-lg rounded-3xl transition-all duration-200"
+              style={{ 
+                backgroundColor: '#FFD400', 
+                color: 'black' 
+              }}
+              onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#FFC400'}
+              onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#FFD400'}
+            >
+              チャレンジを開始
+            </button>
+          </div>
         </div>
 
-        {/* Start Button - With bottom padding for navigation */}
-        <div className="w-full max-w-sm pb-24 pt-6">
-          <button
-            onClick={handleStart}
-            className="w-full h-14 text-lg font-semibold shadow-lg rounded-3xl transition-all duration-200"
-            style={{ 
-              backgroundColor: '#FFD400', 
-              color: 'black' 
-            }}
-            onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#FFC400'}
-            onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#FFD400'}
-          >
-            チャレンジを開始
-          </button>
-        </div>
+        {/* Spacer for bottom navigation */}
+        <div className="w-full max-w-sm pb-20"></div>
       </main>
     </div>
   )
