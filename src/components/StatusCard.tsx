@@ -44,11 +44,6 @@ export default function StatusCard({ nextAlarm, className = '' }: StatusCardProp
           </div>
         </div>
         
-        {nextAlarm && (
-          <div className="text-center pt-4 border-t border-white/10">
-            <div className="text-black dark:text-white text-lg font-medium">{nextAlarm}</div>
-          </div>
-        )}
       </div>
     )
   }
@@ -69,11 +64,6 @@ export default function StatusCard({ nextAlarm, className = '' }: StatusCardProp
         </div>
       </div>
       
-      {nextAlarm && (
-        <div className="text-center pt-4 border-t border-white/10">
-          <div className="text-black dark:text-white text-lg font-medium">{nextAlarm}</div>
-        </div>
-      )}
     </div>
   )
 }

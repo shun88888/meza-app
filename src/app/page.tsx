@@ -57,7 +57,6 @@ export default function HomePage() {
           {/* Status Card */}
           <div className="w-full">
             <StatusCard 
-              nextAlarm={formatTime(wakeTime.hours, wakeTime.minutes)}
               className="w-full"
             />
           </div>
