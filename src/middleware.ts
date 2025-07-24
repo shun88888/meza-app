@@ -4,115 +4,94 @@ import type { NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient<Database>({ req, res })
-
-  // Refresh session if expired - required for Server Components
-  const {
-    data: { session },
-    error
-  } = await supabase.auth.getSession()
-
-  const { pathname } = req.nextUrl
-
-  // Public routes that don't require authentication
-  const publicRoutes = [
-    '/auth/signin',
-    '/auth/signup',
-    '/auth/callback',
-    '/auth/forgot-password',
-    '/auth/reset-password',
-    '/signup',
-    '/login',
-    '/welcome',
-    '/help',
-    '/privacy',
-    '/terms',
-    '/about'
-  ]
-
-  // API routes that don't require authentication
-  const publicApiRoutes = [
-    '/api/webhooks/stripe',
-    '/api/health',
-    '/api/auth'
-  ]
-
-  // Check if current route is public
-  const isPublicRoute = publicRoutes.includes(pathname) || 
-                       publicRoutes.some(route => pathname.startsWith(route + '/'))
-  
-  const isPublicApiRoute = publicApiRoutes.some(route => pathname.startsWith(route))
-
-  // If it's a public route or public API route, allow access
-  if (isPublicRoute || isPublicApiRoute) {
-    return res
-  }
-
-  // For protected routes, check authentication
-  if (!session) {
-    // If accessing an API route, return 401
-    if (pathname.startsWith('/api/')) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { 
-          status: 401,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-    }
-
-    // For web routes, redirect to sign in with the intended destination
-    const redirectUrl = req.nextUrl.clone()
-    redirectUrl.pathname = '/auth/signin'
-    redirectUrl.searchParams.set('redirectTo', pathname)
-    return NextResponse.redirect(redirectUrl)
-  }
-
-  // User is authenticated, check for onboarding completion
-  if (pathname.startsWith('/onboarding')) {
-    // Check if user has completed onboarding
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', session.user.id)
-      .single()
-
-    if (!profile) {
-      // Profile doesn't exist, user needs onboarding
+  try {
+    const res = NextResponse.next()
+    
+    // Skip middleware for static files and API routes that don't need auth
+    const { pathname } = req.nextUrl
+    
+    // Static files and public assets
+    if (
+      pathname.startsWith('/_next/') ||
+      pathname.startsWith('/static/') ||
+      pathname.includes('.') ||
+      pathname === '/favicon.ico' ||
+      pathname === '/manifest.json' ||
+      pathname.startsWith('/icon-')
+    ) {
       return res
     }
 
-    // User has profile, redirect to main app
-    if (pathname === '/onboarding') {
-      const redirectUrl = req.nextUrl.clone()
-      redirectUrl.pathname = '/'
-      return NextResponse.redirect(redirectUrl)
+    // Create Supabase client only if we have the required environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.error('Missing Supabase environment variables')
+      return res
     }
-  }
 
-  // Check for payment method requirement on certain routes
-  const paymentRequiredRoutes = ['/create-challenge', '/challenge']
-  
-  if (paymentRequiredRoutes.some(route => pathname.startsWith(route))) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('stripe_customer_id')
-      .eq('id', session.user.id)
-      .single()
+    const supabase = createMiddlewareClient<Database>({ req, res })
 
-    if (!profile?.stripe_customer_id) {
-      // No payment method setup, redirect to payment setup
-      const redirectUrl = req.nextUrl.clone()
-      redirectUrl.pathname = '/profile/payment-methods'
+    // Refresh session if expired - required for Server Components
+    const {
+      data: { session },
+      error
+    } = await supabase.auth.getSession()
+
+    if (error) {
+      console.error('Supabase auth error in middleware:', error)
+      // Don't block the request, just log the error
+      return res
+    }
+
+    // Public routes that don't require authentication
+    const publicRoutes = [
+      '/auth/signin',
+      '/auth/signup',
+      '/auth/callback',
+      '/auth/forgot-password',
+      '/auth/reset-password',
+      '/signup',
+      '/login',
+      '/welcome',
+      '/help',
+      '/privacy',
+      '/terms',
+      '/about'
+    ]
+
+    // API routes that don't require authentication
+    const publicApiRoutes = [
+      '/api/webhooks/stripe',
+      '/api/health',
+      '/api/auth'
+    ]
+
+    // Check if current route is public
+    const isPublicRoute = publicRoutes.includes(pathname) || 
+                         publicRoutes.some(route => pathname.startsWith(route + '/'))
+    
+    const isPublicApiRoute = publicApiRoutes.some(route => pathname.startsWith(route))
+
+    // If it's a public route or public API route, allow access
+    if (isPublicRoute || isPublicApiRoute) {
+      return res
+    }
+
+    // For protected routes, check authentication
+    if (!session) {
+      // Redirect to signin page for unauthenticated users
+      const redirectUrl = new URL('/auth/signin', req.url)
       redirectUrl.searchParams.set('redirectTo', pathname)
       return NextResponse.redirect(redirectUrl)
     }
-  }
 
-  return res
+    // User is authenticated, allow access
+    return res
+
+  } catch (error) {
+    console.error('Middleware error:', error)
+    // Don't block the request even if middleware fails
+    return NextResponse.next()
+  }
 }
 
 export const config = {
@@ -122,7 +101,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public files (public folder)
+     * - public folder
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
