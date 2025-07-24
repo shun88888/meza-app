@@ -2,11 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase-server'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16'
-})
+let stripe: Stripe | null = null
+
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2023-10-16'
+  })
+}
 
 export async function GET(request: NextRequest) {
+  // Check if Stripe is configured
+  if (!stripe) {
+    return NextResponse.json(
+      { error: 'Payment service is not configured' },
+      { status: 503 }
+    )
+  }
+
   try {
     const supabase = createServerSideClient()
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -73,6 +85,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Check if Stripe is configured
+  if (!stripe) {
+    return NextResponse.json(
+      { error: 'Payment service is not configured' },
+      { status: 503 }
+    )
+  }
+
   try {
     const supabase = createServerSideClient()
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -154,6 +174,14 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  // Check if Stripe is configured
+  if (!stripe) {
+    return NextResponse.json(
+      { error: 'Payment service is not configured' },
+      { status: 503 }
+    )
+  }
+
   try {
     const supabase = createServerSideClient()
     const { data: { user }, error: userError } = await supabase.auth.getUser()
