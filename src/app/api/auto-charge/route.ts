@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       )
     }
+    
+    // At this point, stripe is guaranteed to be non-null
 
     const { challengeId, userId, amount } = await request.json()
 
@@ -178,6 +180,14 @@ export async function POST(request: NextRequest) {
 // Check if auto charge is possible
 export async function GET(request: NextRequest) {
   try {
+    // Check if Stripe is configured
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment service is not configured' },
+        { status: 503 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')
 
@@ -206,6 +216,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if customer has default payment method
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment service is not configured' },
+        { status: 503 }
+      )
+    }
+    
     const customer = await stripe.customers.retrieve(profile.stripe_customer_id)
     
     if (!customer || customer.deleted) {

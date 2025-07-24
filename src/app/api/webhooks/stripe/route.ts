@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     )
   }
+  // At this point, stripe is guaranteed to be non-null
 
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
@@ -37,6 +38,13 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event
 
   try {
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment service is not configured' },
+        { status: 503 }
+      )
+    }
+    
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
   } catch (err) {
     console.error('Webhook signature verification failed:', err)

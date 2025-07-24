@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       )
     }
+    // At this point, stripe is guaranteed to be non-null
 
     const { paymentIntentId } = await request.json()
 
@@ -116,6 +117,14 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    // Check if Stripe is configured
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment service is not configured' },
+        { status: 503 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const paymentIntentId = searchParams.get('payment_intent_id')
 

@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       )
     }
+    // At this point, stripe is guaranteed to be non-null
 
     const { userId, paymentMethodId } = await request.json()
 
@@ -247,6 +248,7 @@ export async function GET(request: NextRequest) {
         { status: 503 }
       )
     }
+    // At this point, stripe is guaranteed to be non-null
 
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')

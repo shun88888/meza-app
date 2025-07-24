@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
       { status: 503 }
     )
   }
+  // At this point, stripe is guaranteed to be non-null
 
   try {
     const supabase = createServerSideClient()
@@ -42,6 +43,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Get payment methods from Stripe
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment service is not configured' },
+        { status: 503 }
+      )
+    }
+    
     const paymentMethods = await stripe.paymentMethods.list({
       customer: profile.stripe_customer_id,
       type: 'card',
@@ -92,6 +100,7 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     )
   }
+  // At this point, stripe is guaranteed to be non-null
 
   try {
     const supabase = createServerSideClient()
@@ -181,6 +190,7 @@ export async function DELETE(request: NextRequest) {
       { status: 503 }
     )
   }
+  // At this point, stripe is guaranteed to be non-null
 
   try {
     const supabase = createServerSideClient()
@@ -212,7 +222,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Detach payment method
-    await stripe.paymentMethods.detach(paymentMethodId)
+          await stripe.paymentMethods.detach(paymentMethodId)
 
     return NextResponse.json({ 
       success: true,

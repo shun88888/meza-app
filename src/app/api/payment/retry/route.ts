@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     )
   }
+  // At this point, stripe is guaranteed to be non-null
 
   try {
     const supabase = createServerSideClient()
@@ -34,6 +35,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the original payment intent
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment service is not configured' },
+        { status: 503 }
+      )
+    }
+    
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
 
     if (!paymentIntent) {
@@ -53,7 +61,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Update payment intent with new payment method
-      updatedPaymentIntent = await stripe.paymentIntents.update(paymentIntentId, {
+              updatedPaymentIntent = await stripe.paymentIntents.update(paymentIntentId, {
         payment_method: paymentMethodId,
       })
 

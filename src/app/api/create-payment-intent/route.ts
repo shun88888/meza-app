@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       )
     }
+    // At this point, stripe is guaranteed to be non-null
 
     const { amount, challengeId, userId } = await request.json()
 
