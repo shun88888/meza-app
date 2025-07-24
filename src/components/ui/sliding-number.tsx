@@ -16,8 +16,8 @@ export function SlidingNumber({ value, padStart = false }: SlidingNumberProps) {
   // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
     return (
-      <span className="inline-block w-[1ch] text-center tabular-nums font-light">
-        0
+      <span className="inline-block min-w-[2ch] text-center tabular-nums font-light">
+        00
       </span>
     );
   }
@@ -25,7 +25,7 @@ export function SlidingNumber({ value, padStart = false }: SlidingNumberProps) {
   const displayValue = padStart ? value.toString().padStart(2, '0') : value.toString();
   
   return (
-    <span className="inline-block w-[1ch] text-center tabular-nums font-light transition-all duration-300">
+    <span className="inline-block min-w-[2ch] text-center tabular-nums font-light transition-all duration-300">
       {displayValue}
     </span>
   );

@@ -31,22 +31,22 @@ export function Clock() {
   // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
     return (
-      <div className='flex items-center justify-center gap-0.5 text-5xl font-light tracking-tight'>
+      <div className='flex items-center justify-center text-5xl font-light tracking-tight'>
         <span className="tabular-nums">00</span>
-        <span className='text-gray-500 dark:text-gray-400'>:</span>
+        <span className='text-gray-500 dark:text-gray-400 mx-1'>:</span>
         <span className="tabular-nums">00</span>
-        <span className='text-gray-500 dark:text-gray-400'>:</span>
+        <span className='text-gray-500 dark:text-gray-400 mx-1'>:</span>
         <span className="tabular-nums">00</span>
       </div>
     );
   }
 
   return (
-    <div className='flex items-center justify-center gap-0.5 text-5xl font-light tracking-tight'>
+    <div className='flex items-center justify-center text-5xl font-light tracking-tight'>
       <SlidingNumber value={hours} padStart={true} />
-      <span className='text-gray-500 dark:text-gray-400'>:</span>
+      <span className='text-gray-500 dark:text-gray-400 mx-1'>:</span>
       <SlidingNumber value={minutes} padStart={true} />
-      <span className='text-gray-500 dark:text-gray-400'>:</span>
+      <span className='text-gray-500 dark:text-gray-400 mx-1'>:</span>
       <SlidingNumber value={seconds} padStart={true} />
     </div>
   );
