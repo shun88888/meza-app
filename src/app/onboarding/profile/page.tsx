@@ -17,6 +17,22 @@ export default function OnboardingProfilePage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
 
+  // Early return after hooks if supabase is not available
+  if (!supabase) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            サービスが利用できません
+          </h1>
+          <p className="text-gray-600">
+            しばらく時間をおいてから再度お試しください。
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   const goals = [
     { value: 'health', label: '健康管理', icon: '🏃‍♂️' },
     { value: 'productivity', label: '生産性向上', icon: '📈' },
@@ -63,19 +79,20 @@ export default function OnboardingProfilePage() {
           wake_up_time: formData.wakeUpTime,
           timezone: formData.timezone,
           notifications_enabled: formData.notifications,
-          onboarding_completed: true,
+          updated_at: new Date().toISOString()
         })
         .eq('id', user.id)
 
       if (error) {
         throw error
       }
-      
-      // Redirect to next step
-      router.push('/onboarding/payment')
+
+      router.push('/onboarding/complete')
     } catch (error) {
-      console.error('Profile save failed:', error)
-      setErrors({ general: 'プロフィールの保存に失敗しました。もう一度お試しください。' })
+      console.error('Profile update error:', error)
+      setErrors({ 
+        submit: error instanceof Error ? error.message : 'プロフィールの更新に失敗しました' 
+      })
     } finally {
       setIsLoading(false)
     }
