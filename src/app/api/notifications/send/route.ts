@@ -3,14 +3,21 @@ import { createServerSideClient } from '@/lib/supabase-server'
 import webpush from 'web-push'
 
 // Configure web-push (these should be environment variables)
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL || 'mailto:support@meza-app.com',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL || 'mailto:support@meza-app.com',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  )
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if VAPID keys are configured
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      return NextResponse.json({ error: 'Push notifications not configured' }, { status: 503 })
+    }
+
     const supabase = createServerSideClient()
     const { data: { user }, error: userError } = await supabase.auth.getUser()
 
