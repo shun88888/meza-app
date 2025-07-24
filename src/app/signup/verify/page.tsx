@@ -1,30 +1,47 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClientSideClient } from '@/lib/supabase'
 
-export default function VerifyPage() {
+export default function VerifyEmailPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClientSideClient()
-  const [email, setEmail] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isResending, setIsResending] = useState(false)
-  const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [resendDisabled, setResendDisabled] = useState(false)
+  const [resendTimer, setResendTimer] = useState(0)
 
   useEffect(() => {
-    // Get email from localStorage (set in signup page)
-    const signupEmail = localStorage.getItem('signupEmail')
-    if (signupEmail) {
-      setEmail(signupEmail)
+    const emailParam = searchParams.get('email')
+    if (emailParam) {
+      setEmail(emailParam)
     } else {
-      // Redirect to signup if no email found
       router.push('/signup')
     }
-  }, [router])
+  }, [searchParams, router])
+
+  // Early return after hooks if supabase is not available
+  if (!supabase) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            サービスが利用できません
+          </h1>
+          <p className="text-gray-600">
+            しばらく時間をおいてから再度お試しください。
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()

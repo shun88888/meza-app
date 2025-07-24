@@ -18,6 +18,22 @@ export default function SignupPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
 
+  // Early return after hooks if supabase is not available
+  if (!supabase) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            サービスが利用できません
+          </h1>
+          <p className="text-gray-600">
+            しばらく時間をおいてから再度お試しください。
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return emailRegex.test(email)

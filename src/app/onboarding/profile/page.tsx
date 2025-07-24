@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientSideClient } from '@/lib/supabase'
+import type { SupabaseClient } from '@supabase/auth-helpers-nextjs'
+import type { Database } from '@/types/database'
 
 export default function OnboardingProfilePage() {
   const router = useRouter()
-  const supabase = createClientSideClient()
+  const supabase = createClientSideClient() as SupabaseClient<Database> | null
   const [formData, setFormData] = useState({
     displayName: '',
     goal: '',
