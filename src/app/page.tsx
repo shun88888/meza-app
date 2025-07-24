@@ -125,7 +125,7 @@ export default function HomePage() {
         </div>
 
         {/* Start Button */}
-        <div className="w-full px-8">
+        <div className="w-full max-w-sm">
           <button
             onClick={handleStart}
             className="w-full h-14 text-lg font-semibold shadow-lg rounded-3xl transition-all duration-200"
