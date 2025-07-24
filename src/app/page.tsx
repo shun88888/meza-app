@@ -51,72 +51,74 @@ export default function HomePage() {
   return (
     <div className="fixed inset-0 overflow-hidden text-black dark:text-white">
       {/* Main Content */}
-      <main className="h-full flex flex-col items-center justify-center px-6 pt-safe pb-safe">
+      <main className="h-full flex flex-col items-center justify-between px-6 pt-safe pb-safe">
         
-        {/* Status Card */}
-        <div className="w-full max-w-sm mb-12">
-          <StatusCard 
-            nextAlarm={formatTime(wakeTime.hours, wakeTime.minutes)}
-            className="w-full"
-          />
-        </div>
+        <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm space-y-12">
+          {/* Status Card */}
+          <div className="w-full">
+            <StatusCard 
+              nextAlarm={formatTime(wakeTime.hours, wakeTime.minutes)}
+              className="w-full"
+            />
+          </div>
 
-        {/* Wake Time Setting */}
-        <div className="w-full max-w-sm mb-12">
-          <div className="bg-white/10 dark:bg-black/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 shadow-lg">
-            <div className="text-center mb-8">
-              <h2 className="text-xl font-semibold mb-4 text-black dark:text-white">起床時刻設定</h2>
-              <div className="text-5xl font-light mb-2 text-black dark:text-white tracking-wider">
-                {formatTime(wakeTime.hours, wakeTime.minutes)}
-              </div>
-            </div>
-
-            {/* Time Controls */}
-            <div className="grid grid-cols-2 gap-6">
-              {/* Hours Control */}
-              <div className="bg-white/5 dark:bg-black/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-                <div className="text-center">
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 font-medium">時間</div>
-                  <div className="flex items-center justify-center gap-4">
-                    <button
-                      onClick={() => adjustTime('hours', false)}
-                      className="w-12 h-12 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 flex items-center justify-center text-xl transition-all duration-200 border border-white/20 active:scale-95"
-                    >
-                      −
-                    </button>
-                    <div className="text-3xl font-light w-16 text-center text-black dark:text-white">
-                      {wakeTime.hours.toString().padStart(2, '0')}
-                    </div>
-                    <button
-                      onClick={() => adjustTime('hours', true)}
-                      className="w-12 h-12 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 flex items-center justify-center text-xl transition-all duration-200 border border-white/20 active:scale-95"
-                    >
-                      +
-                    </button>
-                  </div>
+          {/* Wake Time Setting */}
+          <div className="w-full">
+            <div className="bg-white/10 dark:bg-black/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 shadow-lg">
+              <div className="text-center mb-8">
+                <h2 className="text-xl font-semibold mb-4 text-black dark:text-white">起床時刻設定</h2>
+                <div className="text-5xl font-light mb-2 text-black dark:text-white tracking-wider">
+                  {formatTime(wakeTime.hours, wakeTime.minutes)}
                 </div>
               </div>
 
-              {/* Minutes Control */}
-              <div className="bg-white/5 dark:bg-black/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-                <div className="text-center">
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 font-medium">分</div>
-                  <div className="flex items-center justify-center gap-4">
-                    <button
-                      onClick={() => adjustTime('minutes', false)}
-                      className="w-12 h-12 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 flex items-center justify-center text-xl transition-all duration-200 border border-white/20 active:scale-95"
-                    >
-                      −
-                    </button>
-                    <div className="text-3xl font-light w-16 text-center text-black dark:text-white">
-                      {wakeTime.minutes.toString().padStart(2, '0')}
+              {/* Time Controls */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Hours Control */}
+                <div className="bg-white/5 dark:bg-black/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 font-medium">時間</div>
+                    <div className="flex items-center justify-center gap-4">
+                      <button
+                        onClick={() => adjustTime('hours', false)}
+                        className="w-12 h-12 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 flex items-center justify-center text-xl transition-all duration-200 border border-white/20 active:scale-95"
+                      >
+                        −
+                      </button>
+                      <div className="text-3xl font-light w-16 text-center text-black dark:text-white">
+                        {wakeTime.hours.toString().padStart(2, '0')}
+                      </div>
+                      <button
+                        onClick={() => adjustTime('hours', true)}
+                        className="w-12 h-12 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 flex items-center justify-center text-xl transition-all duration-200 border border-white/20 active:scale-95"
+                      >
+                        +
+                      </button>
                     </div>
-                    <button
-                      onClick={() => adjustTime('minutes', true)}
-                      className="w-12 h-12 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 flex items-center justify-center text-xl transition-all duration-200 border border-white/20 active:scale-95"
-                    >
-                      +
-                    </button>
+                  </div>
+                </div>
+
+                {/* Minutes Control */}
+                <div className="bg-white/5 dark:bg-black/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 font-medium">分</div>
+                    <div className="flex items-center justify-center gap-4">
+                      <button
+                        onClick={() => adjustTime('minutes', false)}
+                        className="w-12 h-12 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 flex items-center justify-center text-xl transition-all duration-200 border border-white/20 active:scale-95"
+                      >
+                        −
+                      </button>
+                      <div className="text-3xl font-light w-16 text-center text-black dark:text-white">
+                        {wakeTime.minutes.toString().padStart(2, '0')}
+                      </div>
+                      <button
+                        onClick={() => adjustTime('minutes', true)}
+                        className="w-12 h-12 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 flex items-center justify-center text-xl transition-all duration-200 border border-white/20 active:scale-95"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -125,7 +127,7 @@ export default function HomePage() {
         </div>
 
         {/* Start Button */}
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm pt-8">
           <button
             onClick={handleStart}
             className="w-full h-14 text-lg font-semibold shadow-lg rounded-3xl transition-all duration-200"

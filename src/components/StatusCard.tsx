@@ -46,7 +46,6 @@ export default function StatusCard({ nextAlarm, className = '' }: StatusCardProp
         
         {nextAlarm && (
           <div className="text-center pt-4 border-t border-white/10">
-            <div className="text-gray-600 dark:text-gray-400 text-xs mb-1">NEXT ALARM</div>
             <div className="text-black dark:text-white text-lg font-medium">{nextAlarm}</div>
           </div>
         )}
@@ -72,7 +71,6 @@ export default function StatusCard({ nextAlarm, className = '' }: StatusCardProp
       
       {nextAlarm && (
         <div className="text-center pt-4 border-t border-white/10">
-          <div className="text-gray-600 dark:text-gray-400 text-xs mb-1">NEXT ALARM</div>
           <div className="text-black dark:text-white text-lg font-medium">{nextAlarm}</div>
         </div>
       )}
