@@ -133,8 +133,8 @@ export default function HomePage() {
               backgroundColor: '#FFD400', 
               color: 'black' 
             }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#FFC400'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = '#FFD400'}
+            onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#FFC400'}
+            onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#FFD400'}
           >
             チャレンジを開始
           </button>
