@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { FeyButton } from '@/components/ui/fey-button'
 
 export default function WelcomePage() {
   const router = useRouter()
@@ -164,18 +165,18 @@ export default function WelcomePage() {
               今すぐアカウントを作成して、理想的な朝の習慣を始めましょう。
             </p>
             <div className="space-y-3">
-              <button
+              <FeyButton
                 onClick={() => router.push('/signup')}
-                className="w-full bg-[#FFAD2F] hover:bg-[#FF9A1F] text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+                className="w-full h-12"
               >
                 無料でアカウント作成
-              </button>
-              <button
+              </FeyButton>
+              <FeyButton
                 onClick={() => router.push('/login')}
-                className="w-full border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 px-4 rounded-lg transition-colors"
+                className="w-full h-12"
               >
                 既存アカウントでログイン
-              </button>
+              </FeyButton>
             </div>
             
             <button

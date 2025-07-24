@@ -124,8 +124,7 @@ function CardRegistrationForm({
       const newPaymentMethod: PaymentMethodInfo = {
         id: result.paymentMethod.id,
         type: result.paymentMethod.type,
-        card: result.paymentMethod.card,
-        isDefault: true
+        card: result.paymentMethod.card
       }
 
       onSuccess?.(newPaymentMethod)

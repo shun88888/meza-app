@@ -1,34 +1,39 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { SUPABASE_CONFIG } from './supabase-config'
+import { SUPABASE_CONFIG, isSupabaseConfigured } from './supabase-config'
 
 // Client-side Supabase client singleton
 let clientSideInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
 
 export const createClientSideClient = () => {
+  if (!isSupabaseConfigured()) {
+    console.warn('Supabase is not configured properly. Running in demo mode.')
+    return null
+  }
+
   if (typeof window === 'undefined') {
     // Server-side: create new instance each time
     return createClientComponentClient<Database>()
   }
   
-  // Client-side: use singleton with storage key
+  // Client-side: use singleton to prevent multiple instances
   if (!clientSideInstance) {
-    clientSideInstance = createClientComponentClient<Database>({
-      supabaseKey: 'meza-app-client'
-    })
+    clientSideInstance = createClientComponentClient<Database>()
   }
   return clientSideInstance
 }
 
 // Admin client (for server actions requiring elevated permissions)
-export const supabase = createClient<Database>(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false,
-  }
-})
+export const supabase = isSupabaseConfigured() 
+  ? createClient<Database>(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      }
+    })
+  : null
 
 // Helper function to create user profile
 export async function createUserProfile(userId: string, email: string) {

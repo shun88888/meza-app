@@ -82,8 +82,8 @@ export default function OnboardingPaymentPage() {
         {/* Card Registration Component */}
         <CardRegistration
           userId={userId || ''}
-          onRegistrationSuccess={handleRegistrationSuccess}
-          onRegistrationError={handleRegistrationError}
+          onSuccess={handleRegistrationSuccess}
+          onError={handleRegistrationError}
           isRequired={false}
         />
 

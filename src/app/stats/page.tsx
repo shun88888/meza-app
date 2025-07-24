@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientSideClient, getCurrentUser } from '@/lib/supabase'
+import { ArrowDownLeft, Bell } from 'lucide-react'
 
 interface Challenge {
   id: string
@@ -40,6 +41,11 @@ export default function StatsPage() {
   const loadStats = async () => {
     try {
       const supabase = createClientSideClient()
+      if (!supabase) {
+        console.error('Failed to create Supabase client')
+        return
+      }
+      
       const user = await getCurrentUser()
       
       if (!user) {
@@ -187,187 +193,189 @@ export default function StatsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="px-4 py-6 pt-safe">
-          <div className="flex items-center">
-            <button
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-md mx-auto bg-white dark:bg-gray-800 min-h-screen">
+        {/* Header */}
+        <div className="px-4 py-6 border-b border-gray-100 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <button 
               onClick={() => router.back()}
-              className="p-2 -ml-2 text-gray-600 hover:text-gray-800"
-              aria-label="戻る"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="m15 18-6-6 6-6"/>
-              </svg>
+              <ArrowDownLeft size={20} className="text-gray-600 dark:text-gray-400 rotate-45" />
             </button>
-            <h1 className="ml-2 text-xl font-semibold text-gray-900">統計</h1>
+            <h1 className="text-lg font-medium text-gray-900 dark:text-white">統計</h1>
+            <div className="w-8" /> {/* Spacer */}
           </div>
         </div>
-      </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="text-gray-500">統計を読み込み中...</div>
-        </div>
-      ) : !stats ? (
-        <div className="text-center py-20">
-          <div className="text-gray-500">統計データを読み込めませんでした</div>
-        </div>
-      ) : (
-        <div className="px-4 py-6 space-y-6">
-          {/* Overall Stats */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-gray-900">{stats.totalChallenges}</div>
-              <div className="text-sm text-gray-600">総チャレンジ</div>
-            </div>
-            <div className={`rounded-lg p-4 text-center ${getSuccessRateBg(stats.successRate)}`}>
-              <div className={`text-2xl font-bold ${getSuccessRateColor(stats.successRate)}`}>
-                {stats.successRate.toFixed(1)}%
-              </div>
-              <div className="text-sm text-gray-600">成功率</div>
-            </div>
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="text-gray-500 dark:text-gray-400">統計を読み込み中...</div>
           </div>
-
-          {/* Success/Failure Breakdown */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.successCount}</div>
-              <div className="text-sm text-gray-600">成功</div>
-            </div>
-            <div className="bg-white rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.failedCount}</div>
-              <div className="text-sm text-gray-600">失敗</div>
-            </div>
+        ) : !stats ? (
+          <div className="text-center py-20">
+            <div className="text-gray-500 dark:text-gray-400">統計データを読み込めませんでした</div>
           </div>
-
-          {/* Streaks */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.bestStreak}</div>
-              <div className="text-sm text-gray-600">最高連続成功</div>
-            </div>
-            <div className="bg-white rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-purple-600">{stats.currentStreak}</div>
-              <div className="text-sm text-gray-600">現在の連続成功</div>
-            </div>
-          </div>
-
-          {/* Penalty Stats */}
-          {stats.totalPenalty > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <h3 className="font-semibold text-red-800 mb-3">ペナルティ統計</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center">
-                  <div className="text-xl font-bold text-red-600">¥{stats.totalPenalty.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">総ペナルティ</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-red-600">¥{Math.round(stats.averagePenalty).toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">平均ペナルティ</div>
+        ) : (
+          <div className="p-4 space-y-4">
+            {/* Main Success Rate Card */}
+            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 text-gray-900 dark:text-white">
+              <div className="text-center">
+                <div className="text-6xl font-light mb-2">{stats.successRate.toFixed(0)}%</div>
+                <div className="text-gray-600 dark:text-gray-400 text-sm">成功率</div>
+                <div className="mt-4 flex justify-center">
+                  <div className="relative w-24 h-24">
+                    <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        d="m18,2.0845 a 15.9155,15.9155 0 0,1 0,31.831 a 15.9155,15.9155 0 0,1 0,-31.831"
+                        fill="none"
+                        stroke="rgba(0,0,0,0.1)"
+                        strokeWidth="2"
+                        className="dark:stroke-white/20"
+                      />
+                      <path
+                        d="m18,2.0845 a 15.9155,15.9155 0 0,1 0,31.831 a 15.9155,15.9155 0 0,1 0,-31.831"
+                        fill="none"
+                        stroke="#FFC700"
+                        strokeWidth="2"
+                        strokeDasharray={`${stats.successRate}, 100`}
+                      />
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Period Toggle */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setSelectedPeriod('week')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                selectedPeriod === 'week'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              週間
-            </button>
-            <button
-              onClick={() => setSelectedPeriod('month')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                selectedPeriod === 'month'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              月間
-            </button>
-          </div>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalChallenges}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">総チャレンジ</div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4">
+                <div className="text-2xl font-bold text-green-600">{stats.successCount}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">成功回数</div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4">
+                <div className="text-2xl font-bold text-blue-600">{stats.currentStreak}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">現在の連続</div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4">
+                <div className="text-2xl font-bold text-purple-600">{stats.bestStreak}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">最高連続</div>
+              </div>
+            </div>
 
-          {/* Charts */}
-          <div className="bg-white rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-4">
-              {selectedPeriod === 'week' ? '週間パフォーマンス' : '月間パフォーマンス'}
-            </h3>
-            <div className="space-y-3">
-              {(selectedPeriod === 'week' ? stats.weeklyStats : stats.monthlyStats).map((item, index) => {
-                const total = item.success + item.failed
-                const successRate = total > 0 ? (item.success / total) * 100 : 0
-                
-                return (
-                  <div key={index} className="flex items-center">
-                    <div className="w-8 text-sm text-gray-600">{'day' in item ? item.day : item.month}</div>
-                    <div className="flex-1 ml-3">
-                      <div className="flex h-6 bg-gray-200 rounded-full overflow-hidden">
-                        {item.success > 0 && (
-                          <div
-                            className="bg-green-500 h-full flex items-center justify-center"
-                            style={{ width: `${(item.success / Math.max(total, 1)) * 100}%` }}
-                          >
-                            {item.success > 0 && (
-                              <span className="text-xs text-white font-medium">{item.success}</span>
-                            )}
-                          </div>
-                        )}
-                        {item.failed > 0 && (
-                          <div
-                            className="bg-red-500 h-full flex items-center justify-center"
-                            style={{ width: `${(item.failed / Math.max(total, 1)) * 100}%` }}
-                          >
-                            {item.failed > 0 && (
-                              <span className="text-xs text-white font-medium">{item.failed}</span>
-                            )}
-                          </div>
-                        )}
+            {/* Performance Chart */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white">パフォーマンス</h3>
+                <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                  <button
+                    onClick={() => setSelectedPeriod('week')}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      selectedPeriod === 'week'
+                        ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400'
+                    }`}
+                  >
+                    週間
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('month')}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      selectedPeriod === 'month'
+                        ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400'
+                    }`}
+                  >
+                    月間
+                  </button>
+                </div>
+              </div>
+              
+              {/* Bar Chart */}
+              <div className="space-y-3">
+                {(selectedPeriod === 'week' ? stats.weeklyStats : stats.monthlyStats).map((item, index) => {
+                  const total = item.success + item.failed
+                  const maxTotal = Math.max(...(selectedPeriod === 'week' ? stats.weeklyStats : stats.monthlyStats).map(i => i.success + i.failed), 1)
+                  
+                  return (
+                    <div key={index} className="flex items-center gap-3">
+                      <div className="w-6 text-xs text-gray-500 dark:text-gray-400 text-right">
+                        {'day' in item ? item.day : item.month}
+                      </div>
+                      <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className="h-full flex">
+                          {item.success > 0 && (
+                            <div
+                              className="bg-green-500 h-full"
+                              style={{ width: `${(item.success / maxTotal) * 100}%` }}
+                            />
+                          )}
+                          {item.failed > 0 && (
+                            <div
+                              className="bg-red-500 h-full"
+                              style={{ width: `${(item.failed / maxTotal) * 100}%` }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                      <div className="w-8 text-xs text-gray-500 dark:text-gray-400 text-right">
+                        {total}
                       </div>
                     </div>
-                    <div className="w-12 text-sm text-gray-600 text-right">
-                      {total > 0 ? `${successRate.toFixed(0)}%` : '-'}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Motivational Message */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/>
-              </svg>
-              <div>
-                <div className="font-medium text-blue-800">
-                  {stats.successRate >= 80 ? '素晴らしい成果です！' :
-                   stats.successRate >= 60 ? '順調に成長しています！' :
-                   stats.currentStreak > 0 ? '今の調子を維持しましょう！' :
-                   '次のチャレンジで挽回しましょう！'}
-                </div>
-                <div className="text-sm text-blue-700">
-                  {stats.successRate >= 80 ? 'この調子で継続していきましょう。' :
-                   stats.successRate >= 60 ? 'もう少しで目標達成です。' :
-                   stats.currentStreak > 0 ? `${stats.currentStreak}日連続成功中です。` :
-                   '小さな一歩から始めましょう。'}
-                </div>
+                  )
+                })}
               </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Bottom spacing for mobile navigation */}
-      <div className="h-20"></div>
+            {/* Penalty Stats */}
+            {stats.totalPenalty > 0 && (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">ペナルティ</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xl font-bold text-red-600">¥{stats.totalPenalty.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">総額</div>
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold text-red-600">¥{Math.round(stats.averagePenalty).toLocaleString()}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">平均</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Achievement Badge */}
+            {(stats.successRate >= 60 || stats.currentStreak > 0) && (
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-2xl p-4 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                    <span className="text-sm">🏆</span>
+                  </div>
+                  <div>
+                    <div className="font-semibold">
+                      {stats.successRate >= 80 ? '素晴らしい成果！' :
+                       stats.successRate >= 60 ? '順調に成長中' :
+                       'いい調子です'}
+                    </div>
+                    <div className="text-xs opacity-90">
+                      {stats.successRate >= 80 ? 'この調子で継続しましょう' :
+                       stats.successRate >= 60 ? 'もう少しで目標達成' :
+                       `${stats.currentStreak}日連続成功中`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bottom spacing for mobile navigation */}
+        <div className="h-20"></div>
+      </div>
     </div>
   )
 }

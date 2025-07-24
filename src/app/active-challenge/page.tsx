@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import SlideToWake, { SlideToWakeRef } from '@/components/SlideToWake'
+import ChallengeLockScreen from '@/components/ChallengeLockScreen'
 import { createClientSideClient, getCurrentUser } from '@/lib/supabase'
 
 interface ChallengeData {
@@ -11,6 +12,12 @@ interface ChallengeData {
   penaltyAmount: number
   startLocation: { lat: number; lng: number }
   startTime: string
+  wakeUpLocation?: {
+    lat: number
+    lng: number
+    address?: string
+  }
+  paymentMethod?: string
 }
 
 export default function ActiveChallengePage() {
@@ -19,6 +26,8 @@ export default function ActiveChallengePage() {
   const [isTracking, setIsTracking] = useState(false)
   const [showCountdown, setShowCountdown] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [isLocked, setIsLocked] = useState(true)
+  const [lockMethod, setLockMethod] = useState<'slide' | 'passcode' | 'both'>('both')
   const router = useRouter()
   const slideToWakeRef = useRef<SlideToWakeRef>(null)
   
@@ -62,6 +71,20 @@ export default function ActiveChallengePage() {
   useEffect(() => {
     const fetchActiveChallenge = async () => {
       try {
+        // Try localStorage first for immediate access
+        const localChallenge = localStorage.getItem('activeChallenge')
+        if (localChallenge) {
+          try {
+            const parsedChallenge = JSON.parse(localChallenge)
+            setChallengeData(parsedChallenge)
+            return
+          } catch (parseError) {
+            console.error('Error parsing local challenge:', parseError)
+            localStorage.removeItem('activeChallenge')
+          }
+        }
+
+        // If no localStorage, try database
         const user = await getCurrentUser()
         if (!user) {
           router.push('/auth/signin')
@@ -69,15 +92,28 @@ export default function ActiveChallengePage() {
         }
 
         const supabase = createClientSideClient()
-        const { data: challenge, error } = await supabase
+        if (!supabase) {
+          console.error('Failed to create Supabase client')
+          router.push('/')
+          return
+        }
+        
+        const { data: challenges, error } = await supabase
           .from('challenges')
           .select('*')
           .eq('user_id', user.id)
           .eq('status', 'active')
-          .single()
 
-        if (error || !challenge) {
-          // No active challenge, redirect to home
+        if (error) {
+          console.error('Database query error:', error)
+          router.push('/')
+          return
+        }
+
+        const challenge = challenges && challenges.length > 0 ? challenges[0] : null
+
+        if (!challenge) {
+          console.log('No active challenge found')
           router.push('/')
           return
         }
@@ -91,7 +127,13 @@ export default function ActiveChallengePage() {
             lat: challenge.home_lat || challenge.home_latitude,
             lng: challenge.home_lng || challenge.home_longitude
           },
-          startTime: challenge.started_at || new Date().toISOString()
+          startTime: challenge.started_at || new Date().toISOString(),
+          wakeUpLocation: {
+            lat: challenge.target_lat || challenge.target_latitude,
+            lng: challenge.target_lng || challenge.target_longitude,
+            address: challenge.target_address
+          },
+          paymentMethod: '登録済みのカード'
         }
 
         setChallengeData(challengeData)
@@ -103,6 +145,15 @@ export default function ActiveChallengePage() {
 
     fetchActiveChallenge()
   }, [router])
+
+  // ロック解除ハンドラー
+  const handleUnlock = () => {
+    setIsLocked(false)
+    
+    // 解除時刻をローカルストレージに保存
+    const unlockTime = new Date().toISOString()
+    localStorage.setItem('challengeUnlockTime', unlockTime)
+  }
 
   const handleDissolveChallenge = async () => {
     if (!challengeData) return
@@ -316,6 +367,27 @@ export default function ActiveChallengePage() {
       <div className="full-screen-safe overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-center" style={{ zIndex: 1001 }}>
         <div className="text-gray-400">チャレンジデータを読み込み中...</div>
       </div>
+    )
+  }
+
+  // ロック画面を表示
+  if (isLocked) {
+    return (
+      <ChallengeLockScreen
+        challengeData={{
+          ...challengeData,
+          wakeUpLocation: challengeData.wakeUpLocation || null,
+          paymentMethod: challengeData.paymentMethod || '登録済みのカード'
+        }}
+        onUnlock={handleUnlock}
+        unlockMethod={lockMethod}
+        passcode="1234"
+        unlockRestrictions={{
+          timeRestriction: true,
+          locationRestriction: true,
+          minDistance: 100
+        }}
+      />
     )
   }
 

@@ -7,6 +7,8 @@ import SlideToWake from '@/components/SlideToWake'
 import CountdownScreen from '@/components/CountdownScreen'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { getFormattedAddressFromCoords, formatAddress } from '@/lib/addressFormatter'
+import { getPaymentMethods, PaymentMethodInfo } from '@/lib/stripe'
+import { getCurrentUser } from '@/lib/supabase'
 
 // Dynamic import to avoid SSR issues - use direct import path
 const MapPicker = dynamic(() => import('../../components/MapPicker'), {
@@ -29,6 +31,7 @@ interface ChallengeData {
   penaltyAmount: number
   wakeUpLocation: Location | null
   paymentMethod: string
+  selectedPaymentMethodId?: string
 }
 
 export default function CreateChallengePage() {
@@ -86,8 +89,41 @@ export default function CreateChallengePage() {
     wakeTime: getDefaultWakeTime(),
     penaltyAmount: 300,
     wakeUpLocation: null,
-    paymentMethod: '●●●● ●●●● ●●●● 1071'
+    paymentMethod: '支払い方法を設定してください'
   })
+  
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodInfo[]>([])
+  const [loadingPayment, setLoadingPayment] = useState(true)
+
+  // 支払い方法を取得
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (user) {
+          const methods = await getPaymentMethods(user.id)
+          setPaymentMethods(methods.paymentMethods)
+          
+          if (methods.paymentMethods.length > 0) {
+            const defaultMethod = methods.paymentMethods[0]
+            setChallengeData(prev => ({
+              ...prev,
+              paymentMethod: defaultMethod.card 
+                ? `${defaultMethod.card.brand.toUpperCase()} •••• ${defaultMethod.card.last4}`
+                : '登録済みのカード',
+              selectedPaymentMethodId: defaultMethod.id
+            }))
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching payment methods:', error)
+      } finally {
+        setLoadingPayment(false)
+      }
+    }
+
+    fetchPaymentMethods()
+  }, [])
 
   // 現在地を取得して初期位置に設定
   useEffect(() => {
@@ -242,17 +278,23 @@ export default function CreateChallengePage() {
     // 支払い方法の更新
     const paymentMethodId = searchParams.get('paymentMethodId')
     if (paymentMethodId) {
-      setChallengeData(prev => ({
-        ...prev,
-        paymentMethod: '登録済みのカード'
-      }))
+      const selectedMethod = paymentMethods.find(method => method.id === paymentMethodId)
+      if (selectedMethod) {
+        setChallengeData(prev => ({
+          ...prev,
+          paymentMethod: selectedMethod.card 
+            ? `${selectedMethod.card.brand.toUpperCase()} •••• ${selectedMethod.card.last4}`
+            : '登録済みのカード',
+          selectedPaymentMethodId: paymentMethodId
+        }))
+      }
     }
 
     // URLをクリアして、戻るボタンが期待通りに動作するようにする
     if (searchParams.toString()) {
       router.replace('/create-challenge', { scroll: false })
     }
-  }, [searchParams, router])
+  }, [searchParams, router, paymentMethods])
 
   const handleLocationSelect = (location: Location) => {
     setChallengeData(prev => ({
@@ -261,21 +303,60 @@ export default function CreateChallengePage() {
     }))
   }
 
+  // カードブランドアイコンを取得
+  const getCardBrandIcon = (brand?: string) => {
+    if (!brand) {
+      return (
+        <div className="w-6 h-4 bg-gray-300 rounded mr-3 flex items-center justify-center">
+          <span className="text-xs text-gray-600">💳</span>
+        </div>
+      )
+    }
+
+    switch (brand.toLowerCase()) {
+      case 'visa':
+        return (
+          <svg width="24" height="16" viewBox="0 0 24 16" className="mr-3">
+            <g fill="none" fillRule="nonzero">
+              <rect width="23.5" height="15.5" x="0.25" y="0.25" fill="#FFF" stroke="#000" strokeOpacity="0.2" strokeWidth="0.5" rx="2"/>
+              <path fill="#171E6C" d="M2.788 5.914A7.201 7.201 0 001 5.237l.028-.125h2.737c.371.013.672.125.77.519l.595 2.836.182.854 1.666-4.21h1.799l-2.674 6.167H4.304L2.788 5.914zm7.312 5.37H8.399l1.064-6.172h1.7L10.1 11.284zm6.167-6.021l-.232 1.333-.153-.066a3.054 3.054 0 00-1.268-.236c-.671 0-.972.269-.98.531 0 .29.365.48.96.762.98.44 1.435.979 1.428 1.681-.014 1.28-1.176 2.108-2.96 2.108-.764-.007-1.5-.158-1.898-.328l.238-1.386.224.099c.553.23.917.328 1.596.328.49 0 1.015-.19 1.022-.604 0-.27-.224-.466-.882-.769-.644-.295-1.505-.788-1.491-1.674C11.878 5.84 13.06 5 14.74 5c.658 0 1.19.138 1.526.263zm2.26 3.834h1.415c-.07-.308-.392-1.786-.392-1.786l-.12-.531c-.083.23-.23.604-.223.59l-.68 1.727zm2.1-3.985L22 11.284h-1.575s-.154-.71-.203-.926h-2.184l-.357.926h-1.785l2.527-5.66c.175-.4.483-.512.889-.512h1.316z"/>
+            </g>
+          </svg>
+        )
+      case 'mastercard':
+        return (
+          <svg width="24" height="16" viewBox="0 0 24 16" className="mr-3">
+            <g fill="none" fillRule="nonzero">
+              <rect width="23.5" height="15.5" x="0.25" y="0.25" fill="#FFF" stroke="#000" strokeOpacity="0.2" strokeWidth="0.5" rx="2"/>
+              <circle cx="9" cy="8" r="4" fill="#EB001B"/>
+              <circle cx="15" cy="8" r="4" fill="#F79E1B"/>
+              <path fill="#FF5F00" d="M12 4.5c-.78 0-1.5.31-2.04.81A3.97 3.97 0 0 1 12 8c.78 0 1.5-.31 2.04-.81A3.97 3.97 0 0 0 12 4.5z"/>
+            </g>
+          </svg>
+        )
+      case 'jcb':
+        return (
+          <svg width="24" height="16" viewBox="0 0 24 16" className="mr-3">
+            <g fill="none" fillRule="nonzero">
+              <rect width="23.5" height="15.5" x="0.25" y="0.25" fill="#FFF" stroke="#000" strokeOpacity="0.2" strokeWidth="0.5" rx="2"/>
+              <text x="12" y="10" textAnchor="middle" fill="#007B3F" fontSize="8" fontFamily="Arial, sans-serif" fontWeight="bold">JCB</text>
+            </g>
+          </svg>
+        )
+      default:
+        return (
+          <div className="w-6 h-4 bg-gray-300 rounded mr-3 flex items-center justify-center">
+            <span className="text-xs text-gray-600">💳</span>
+          </div>
+        )
+    }
+  }
+
   const handleSlideComplete = async () => {
     // Check if user has payment method registered
-    try {
-      const { checkAutoCharge } = await import('@/lib/stripe')
-      const autoChargeCheck = await checkAutoCharge('mock-user-id') // Replace with actual user ID
-      
-      if (!autoChargeCheck.canAutoCharge) {
-        // Show alert for missing payment method
-        alert('チャレンジを開始するには、クレジットカードの登録が必要です。プロフィール画面からカード情報を登録してください。')
-        router.push('/profile/payment-methods')
-        return
-      }
-    } catch (error) {
-      console.error('Failed to check payment method:', error)
-      alert('決済情報の確認に失敗しました。もう一度お試しください。')
+    if (!challengeData.selectedPaymentMethodId || paymentMethods.length === 0) {
+      alert('チャレンジを開始するには、クレジットカードの登録が必要です。支払い方法を設定してください。')
+      router.push('/create-challenge/payment')
       return
     }
 
@@ -357,20 +438,27 @@ export default function CreateChallengePage() {
 
   return (
     <div className="full-screen-safe overflow-hidden bg-gray-50 relative" style={{ zIndex: 1001 }}>
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-30 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 p-4 pt-safe">
-        <div className="flex items-center">
-          <button
-            onClick={() => router.back()}
-            className="p-2 -ml-2 text-gray-600 hover:text-gray-800"
-            aria-label="戻る"
+      {/* Back Button */}
+      <div className="absolute top-4 left-4" style={{ zIndex: 1 }}>
+        <button
+          aria-label="戻る"
+          onClick={() => router.back()}
+          className="flex items-center justify-center bg-white rounded-full shadow-lg"
+          style={{ height: '48px', width: '48px' }}
+          tabIndex={0}
+          type="button"
+        >
+          <svg
+            aria-hidden="true"
+            className="w-5 h-5"
+            height="20"
+            viewBox="0 0 24 24"
+            width="20"
+            fill="currentColor"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="m15 18-6-6 6-6"/>
-            </svg>
-          </button>
-          <h1 className="ml-2 text-lg font-semibold text-gray-800">チャレンジを作成</h1>
-        </div>
+            <path d="m4.41 13 6.3 6.3-1.42 1.4L.6 12l8.7-8.7 1.42 1.4L4.4 11H24v2z"></path>
+          </svg>
+        </button>
       </div>
 
       {/* Background Map */}
@@ -378,13 +466,14 @@ export default function CreateChallengePage() {
         <style type="text/css">{`
           #setting-location-map .leaflet-container {
             width: 100%;
-            height: 612px;
+            height: 100vh;
+            height: 100dvh;
           }
         `}</style>
         <div id="setting-location-map">
           <ErrorBoundary 
             fallback={
-              <div className="loading-container" style={{ height: '612px' }}>
+              <div className="loading-container h-full flex items-center justify-center">
                 <div>地図コンポーネントのエラーが発生しました</div>
               </div>
             }
@@ -392,7 +481,7 @@ export default function CreateChallengePage() {
             <MapPicker
               location={challengeData.wakeUpLocation}
               onLocationSelect={handleLocationSelect}
-              height="612px"
+              height="100vh"
               className="w-full"
               wakeUpLocation={challengeData.wakeUpLocation}
               showPins={true}
@@ -481,14 +570,32 @@ export default function CreateChallengePage() {
             >
               <div className="w-16 text-xs text-gray-500 tracking-wide">支払方法</div>
               <div className="flex-1 flex items-center text-sm text-gray-800">
-                {/* Visa icon */}
-                <svg width="24" height="16" viewBox="0 0 24 16" className="mr-3">
-                  <g fill="none" fillRule="nonzero">
-                    <rect width="23.5" height="15.5" x="0.25" y="0.25" fill="#FFF" stroke="#000" strokeOpacity="0.2" strokeWidth="0.5" rx="2"/>
-                    <path fill="#171E6C" d="M2.788 5.914A7.201 7.201 0 001 5.237l.028-.125h2.737c.371.013.672.125.77.519l.595 2.836.182.854 1.666-4.21h1.799l-2.674 6.167H4.304L2.788 5.914zm7.312 5.37H8.399l1.064-6.172h1.7L10.1 11.284zm6.167-6.021l-.232 1.333-.153-.066a3.054 3.054 0 00-1.268-.236c-.671 0-.972.269-.98.531 0 .29.365.48.96.762.98.44 1.435.979 1.428 1.681-.014 1.28-1.176 2.108-2.96 2.108-.764-.007-1.5-.158-1.898-.328l.238-1.386.224.099c.553.23.917.328 1.596.328.49 0 1.015-.19 1.022-.604 0-.27-.224-.466-.882-.769-.644-.295-1.505-.788-1.491-1.674C11.878 5.84 13.06 5 14.74 5c.658 0 1.19.138 1.526.263zm2.26 3.834h1.415c-.07-.308-.392-1.786-.392-1.786l-.12-.531c-.083.23-.23.604-.223.59l-.68 1.727zm2.1-3.985L22 11.284h-1.575s-.154-.71-.203-.926h-2.184l-.357.926h-1.785l2.527-5.66c.175-.4.483-.512.889-.512h1.316z"/>
-                  </g>
-                </svg>
-                {challengeData.paymentMethod}
+                {loadingPayment ? (
+                  <div className="text-gray-400">読み込み中...</div>
+                ) : (
+                  <>
+                    {challengeData.selectedPaymentMethodId && paymentMethods.length > 0 ? (
+                      (() => {
+                        const selectedMethod = paymentMethods.find(method => method.id === challengeData.selectedPaymentMethodId)
+                        return selectedMethod ? (
+                          <>
+                            {getCardBrandIcon(selectedMethod.card?.brand)}
+                            {challengeData.paymentMethod}
+                          </>
+                        ) : (
+                          <span className="text-gray-400">支払い方法を設定してください</span>
+                        )
+                      })()
+                    ) : (
+                      <>
+                        <div className="w-6 h-4 bg-gray-300 rounded mr-3 flex items-center justify-center">
+                          <span className="text-xs text-gray-600">💳</span>
+                        </div>
+                        <span className="text-gray-400">支払い方法を設定してください</span>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
               <div className="px-3">
                 <svg width="8" height="10" viewBox="0 0 8 10" className="text-gray-400">

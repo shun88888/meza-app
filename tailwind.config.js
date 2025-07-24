@@ -23,18 +23,18 @@ module.exports = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "#FFAD2F",
-          50: "#FFF8E6",
-          100: "#FFF0CC",
-          200: "#FFE199",
-          300: "#FFD166",
-          400: "#FFC233",
-          500: "#FFAD2F",
-          600: "#E6941A",
-          700: "#CC7A05",
-          800: "#B36100",
-          900: "#994700",
-          foreground: "#FFFFFF",
+          DEFAULT: "#FFC700",
+          50: "#FFFEF0",
+          100: "#FFFCE0",
+          200: "#FFF9C2",
+          300: "#FFF485",
+          400: "#FFED47",
+          500: "#FFC700",
+          600: "#E6B300",
+          700: "#CC9F00",
+          800: "#B38A00",
+          900: "#997500",
+          foreground: "#000000",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -61,9 +61,13 @@ module.exports = {
           foreground: "hsl(var(--card-foreground))",
         },
         timee: {
-          orange: "#FFAD2F",
-          "orange-dark": "#E6941A",
-          "orange-light": "#FFC233",
+          orange: "#FFC700",
+          "orange-dark": "#E6B300",
+          "orange-light": "#FFED47",
+        },
+        glass: {
+          white: "rgba(255, 255, 255, 0.1)",
+          black: "rgba(0, 0, 0, 0.1)",
         }
       },
       spacing: {
@@ -134,6 +138,22 @@ module.exports = {
         '.min-h-screen-mobile': {
           'min-height': '100vh',
           'min-height': '100dvh',
+        },
+        '.glass-effect': {
+          'backdrop-filter': 'blur(20px)',
+          'background': 'rgba(255, 255, 255, 0.1)',
+          'border': '1px solid rgba(255, 255, 255, 0.2)',
+        },
+        '.glass-dark': {
+          'backdrop-filter': 'blur(20px)',
+          'background': 'rgba(0, 0, 0, 0.1)',
+          'border': '1px solid rgba(255, 255, 255, 0.1)',
+        },
+        '.card-shadow': {
+          'box-shadow': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        },
+        '.card-shadow-lg': {
+          'box-shadow': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
         },
       })
     }

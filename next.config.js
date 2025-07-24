@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Disable strict mode to prevent double renders in development
-  reactStrictMode: false,
+  // Enable strict mode for better development experience
+  reactStrictMode: true,
   
   // Improve error handling
   onDemandEntries: {

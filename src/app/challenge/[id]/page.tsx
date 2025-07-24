@@ -56,6 +56,11 @@ export default function ChallengePage() {
         }
 
         const supabase = createClientSideClient()
+        if (!supabase) {
+          console.error('Failed to create Supabase client')
+          return
+        }
+        
         const { data: challenge, error } = await supabase
           .from('challenges')
           .select('*')
@@ -88,6 +93,11 @@ export default function ChallengePage() {
     
     try {
       const supabase = createClientSideClient()
+      if (!supabase) {
+        console.error('Failed to create Supabase client')
+        return
+      }
+      
       const { error } = await supabase
         .from('challenges')
         .update({ 

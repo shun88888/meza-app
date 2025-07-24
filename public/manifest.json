@@ -8,8 +8,8 @@
     "standalone",
     "minimal-ui"
   ],
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#ffffff",
+  "theme_color": "#FFC700",
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "ja",

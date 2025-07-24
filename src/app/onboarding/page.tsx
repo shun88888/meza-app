@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { FeyButton } from '@/components/ui/fey-button'
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -142,19 +143,19 @@ export default function OnboardingPage() {
 
         {/* Actions */}
         <div className="space-y-3">
-          <button
+          <FeyButton
             onClick={handleStart}
-            className="w-full bg-[#FFAD2F] hover:bg-[#FF9A1F] text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+            className="w-full h-12"
           >
             設定を開始
-          </button>
+          </FeyButton>
           
-          <button
+          <FeyButton
             onClick={handleSkip}
-            className="w-full border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 px-4 rounded-lg transition-colors"
+            className="w-full h-12"
           >
             後で設定する
-          </button>
+          </FeyButton>
         </div>
 
         {/* Help Text */}

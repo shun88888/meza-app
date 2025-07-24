@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { getCurrentUser, signOut } from '@/lib/supabase'
+import { InteractiveMenu, InteractiveMenuItem } from '@/components/ui/modern-mobile-menu'
+import { Home, BarChart3, History, User, Settings } from 'lucide-react'
+import { useNavigationGuard } from '@/hooks/useNavigationGuard'
 
 interface NavigationProps {
   children: React.ReactNode
@@ -15,6 +18,11 @@ export default function Navigation({ children }: NavigationProps) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
+  const { guardedPush } = useNavigationGuard({
+    enableExternalLinkBlocking: true,
+    enableRouteGuarding: true,
+    showBlockedMessage: true,
+  })
 
   useEffect(() => {
     const checkUser = async () => {
@@ -46,7 +54,7 @@ export default function Navigation({ children }: NavigationProps) {
       '/signup',
       '/login',
       '/welcome',
-      '/help',
+      '/settings',
       '/privacy',
       '/terms',
       '/about'
@@ -74,11 +82,31 @@ export default function Navigation({ children }: NavigationProps) {
 
   // Bottom navigation items
   const bottomNavItems = [
-    { href: '/stats', label: '統計', icon: '📊' },
-    { href: '/history', label: '履歴', icon: '📋' },
     { href: '/', label: 'ホーム', icon: '🏠' },
-    { href: '/profile', label: 'プロフィール', icon: '👤' },
+    { href: '/stats', label: '統計', icon: '🔐' },
+    { href: '/history', label: '履歴', icon: '📅' },
+    { href: '/settings', label: '設定', icon: '⚙️' },
   ]
+
+  // Modern mobile menu items
+  const mobileMenuItems: InteractiveMenuItem[] = [
+    { label: 'ホーム', icon: Home },
+    { label: '統計', icon: BarChart3 },
+    { label: '履歴', icon: History },
+    { label: '設定', icon: Settings },
+  ]
+
+  // Navigation routes for menu items
+  const navigationRoutes = [
+    '/',
+    '/stats',
+    '/history',
+    '/settings',
+  ]
+
+  const handleMenuItemClick = (index: number, title: string) => {
+    guardedPush(navigationRoutes[index])
+  }
 
   const menuItems = [
     { href: '/', label: 'ホーム', icon: '🏠' },
@@ -110,8 +138,8 @@ export default function Navigation({ children }: NavigationProps) {
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-lg">読み込み中...</div>
+      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
+        <div className="text-black dark:text-white text-lg">読み込み中...</div>
       </div>
     )
   }
@@ -124,164 +152,42 @@ export default function Navigation({ children }: NavigationProps) {
   // If user is not authenticated and on a protected route, show loading
   if (!user && !isPublicRoute(pathname)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-lg">認証中...</div>
+      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
+        <div className="text-black dark:text-white text-lg">認証中...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-slate-800/95 backdrop-blur-sm border-b border-slate-700">
-        <div className="px-4 py-3 pt-safe">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">M</span>
-              </div>
-              <span className="text-white font-semibold">Meza</span>
-            </Link>
-
-            {/* Menu Button */}
-            <button
-              onClick={toggleMenu}
-              className="p-2 text-white hover:bg-slate-700 rounded-lg transition-colors"
-              aria-label="メニューを開く"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 12h18M3 6h18M3 18h18"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Sidebar Overlay */}
-      {isMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={closeMenu}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={`fixed top-0 right-0 h-full w-80 bg-slate-800 z-50 transform transition-transform duration-300 ${
-        isMenuOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}>
-        <div className="p-4 pt-safe">
-          {/* Close Button */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-white text-lg font-semibold">メニュー</h2>
-            <button
-              onClick={closeMenu}
-              className="p-2 text-white hover:bg-slate-700 rounded-lg transition-colors"
-              aria-label="メニューを閉じる"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* User Info */}
-          {user && (
-            <div className="bg-slate-700 rounded-lg p-4 mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-semibold">
-                    {user.email?.charAt(0).toUpperCase() || 'U'}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-white font-medium">{user.email}</p>
-                  <p className="text-slate-400 text-sm">ログイン中</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation Menu */}
-          <nav className="space-y-2">
-            {user ? (
-              <>
-                {menuItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={closeMenu}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                      pathname === item.href
-                        ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white'
-                        : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                    }`}
-                  >
-                    <span className="text-xl">{item.icon}</span>
-                    <span className="font-medium">{item.label}</span>
-                  </Link>
-                ))}
-                
-                {/* Divider */}
-                <div className="border-t border-slate-600 my-4" />
-                
-                {/* Sign Out */}
-                <button
-                  onClick={handleSignOut}
-                  className="flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-red-400 hover:bg-red-500/20 hover:text-red-300 w-full"
-                >
-                  <span className="text-xl">🚪</span>
-                  <span className="font-medium">ログアウト</span>
-                </button>
-              </>
-            ) : (
-              <>
-                {authMenuItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={closeMenu}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                      pathname === item.href
-                        ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white'
-                        : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                    }`}
-                  >
-                    <span className="text-xl">{item.icon}</span>
-                    <span className="font-medium">{item.label}</span>
-                  </Link>
-                ))}
-              </>
-            )}
-          </nav>
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-white dark:bg-black">
       {/* Main Content */}
-      <main className="pt-16 pb-20 min-h-screen">
+      <main className="pb-20 min-h-screen">
         {children}
       </main>
 
       {/* Bottom Navigation - Only show for authenticated users */}
       {user && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-slate-800/95 backdrop-blur-sm border-t border-slate-700 pb-safe">
-          <div className="flex items-center justify-around px-4 py-2">
-            {bottomNavItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
-                  pathname === item.href
-                    ? 'text-orange-400'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <span className="text-xl">{item.icon}</span>
-                <span className="text-xs font-medium">{item.label}</span>
-              </Link>
-            ))}
+        <div className="fixed bottom-0 left-0 right-0 pb-safe">
+          <div className="flex justify-center py-3">
+            <div className="w-full max-w-sm">
+              <div onClick={(e) => {
+                const target = e.target as HTMLElement;
+                const button = target.closest('button');
+                if (button) {
+                  const index = Array.from(button.parentElement?.children || []).indexOf(button);
+                  if (index !== -1) {
+                    handleMenuItemClick(index, mobileMenuItems[index]?.label || '');
+                  }
+                }
+              }}>
+                <InteractiveMenu 
+                  items={mobileMenuItems}
+                  accentColor="var(--primary)"
+                />
+              </div>
+            </div>
           </div>
-        </nav>
+        </div>
       )}
     </div>
   )

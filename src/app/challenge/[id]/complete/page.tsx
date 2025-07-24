@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { createPaymentIntent, confirmPayment } from '@/lib/stripe'
 import { loadStripe } from '@stripe/stripe-js'
 import { formatAddress } from '@/lib/addressFormatter'
+import CompletionScreen from '@/components/CompletionScreen'
 
 interface Location {
   lat: number
@@ -32,6 +33,8 @@ export default function CompleteChallengePage() {
   const [challenge, setChallenge] = useState<Challenge | null>(null)
   const [showPenaltyPayment, setShowPenaltyPayment] = useState(false)
   const [paymentProcessing, setPaymentProcessing] = useState(false)
+  const [showSuccessScreen, setShowSuccessScreen] = useState(false)
+  const [showFailureScreen, setShowFailureScreen] = useState(false)
   
 
 
@@ -161,10 +164,9 @@ export default function CompleteChallengePage() {
       if (completeResponse.ok) {
         const result = await completeResponse.json()
         if (isSuccess) {
-          alert('チャレンジが正常に完了しました！おめでとうございます！')
-          router.push('/')
+          setShowSuccessScreen(true)
         } else {
-          setShowPenaltyPayment(true)
+          setShowFailureScreen(true)
         }
       } else {
         throw new Error('Failed to complete challenge')
@@ -217,6 +219,43 @@ export default function CompleteChallengePage() {
   const handleRetryChallenge = () => {
     setShowPenaltyPayment(false)
     setCurrentLocation(null)
+  }
+
+  // Success Screen
+  if (showSuccessScreen) {
+    return (
+      <CompletionScreen
+        isSuccess={true}
+        title="チャレンジ成功！"
+        message="おめでとうございます！目標地点に時間内に到着しました。素晴らしい早起きでした！"
+        primaryButtonText="ホームに戻る"
+        onPrimaryAction={() => router.push('/')}
+        showConfetti={true}
+        autoRedirect={{
+          url: '/',
+          delay: 10000
+        }}
+      />
+    )
+  }
+
+  // Failure Screen
+  if (showFailureScreen) {
+    return (
+      <CompletionScreen
+        isSuccess={false}
+        title="チャレンジ失敗"
+        message="目標時間内に到着できませんでした。ペナルティ決済が必要です。"
+        penaltyAmount={challenge?.penaltyAmount}
+        primaryButtonText="ペナルティを支払う"
+        secondaryButtonText="再チャレンジ"
+        onPrimaryAction={() => setShowPenaltyPayment(true)}
+        onSecondaryAction={() => {
+          setShowFailureScreen(false)
+          setCurrentLocation(null)
+        }}
+      />
+    )
   }
 
   if (showPenaltyPayment) {
