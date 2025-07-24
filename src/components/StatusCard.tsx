@@ -28,10 +28,10 @@ export default function StatusCard({ nextAlarm, className = '' }: StatusCardProp
   // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
     return (
-      <div className={`bg-white/10 dark:bg-black/10 backdrop-blur-md rounded-3xl p-6 card-shadow-lg border border-white/20 ${className}`}>
-        <div className="text-center mb-6">
-          <div className="text-black dark:text-white mb-2">
-            <div className='flex items-center justify-center gap-0.5 text-5xl font-light tracking-tight'>
+      <div className={`bg-white/10 dark:bg-black/10 backdrop-blur-md rounded-3xl p-4 card-shadow-lg border border-white/20 ${className}`}>
+        <div className="text-center mb-4">
+          <div className="text-black dark:text-white mb-1">
+            <div className='flex items-center justify-center gap-0.5 text-4xl font-light tracking-tight'>
               <span className="tabular-nums">00</span>
               <span className='text-gray-500 dark:text-gray-400'>:</span>
               <span className="tabular-nums">00</span>
@@ -39,22 +39,28 @@ export default function StatusCard({ nextAlarm, className = '' }: StatusCardProp
               <span className="tabular-nums">00</span>
             </div>
           </div>
-          <div className="text-gray-600 dark:text-gray-400 text-sm">
+          <div className="text-gray-600 dark:text-gray-400 text-xs">
             Loading...
           </div>
         </div>
         
+        {nextAlarm && (
+          <div className="text-center pt-3 border-t border-white/10">
+            <div className="text-gray-600 dark:text-gray-400 text-xs mb-1">NEXT ALARM</div>
+            <div className="text-black dark:text-white text-base font-medium">{nextAlarm}</div>
+          </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className={`bg-white/10 dark:bg-black/10 backdrop-blur-md rounded-3xl p-6 card-shadow-lg border border-white/20 ${className}`}>
-      <div className="text-center mb-6">
-        <div className="text-black dark:text-white mb-2">
+    <div className={`bg-white/10 dark:bg-black/10 backdrop-blur-md rounded-3xl p-4 card-shadow-lg border border-white/20 ${className}`}>
+      <div className="text-center mb-4">
+        <div className="text-black dark:text-white mb-1">
           <Clock />
         </div>
-        <div className="text-gray-600 dark:text-gray-400 text-sm">
+        <div className="text-gray-600 dark:text-gray-400 text-xs">
           {currentTime.toLocaleDateString('ja-JP', { 
             year: 'numeric', 
             month: 'long', 
@@ -64,6 +70,12 @@ export default function StatusCard({ nextAlarm, className = '' }: StatusCardProp
         </div>
       </div>
       
+      {nextAlarm && (
+        <div className="text-center pt-3 border-t border-white/10">
+          <div className="text-gray-600 dark:text-gray-400 text-xs mb-1">NEXT ALARM</div>
+          <div className="text-black dark:text-white text-base font-medium">{nextAlarm}</div>
+        </div>
+      )}
     </div>
   )
 }

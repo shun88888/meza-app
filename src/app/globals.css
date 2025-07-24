@@ -2,6 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+  --vh: 1vh;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+/* Safari viewport height fix */
+.h-screen-safe {
+  height: calc(var(--vh, 1vh) * 100);
+}
+
+.min-h-screen-mobile {
+  min-height: calc(var(--vh, 1vh) * 100);
+  min-height: -webkit-fill-available;
+}
+
+/* Safe area padding for iOS */
+.py-safe-offset {
+  padding-top: env(safe-area-inset-top, 1rem);
+  padding-bottom: env(safe-area-inset-bottom, 1rem);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
