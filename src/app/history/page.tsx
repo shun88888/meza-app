@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClientSideClient, getCurrentUser } from '@/lib/supabase'
 import { formatAddress } from '@/lib/addressFormatter'
 import { ArrowUpRight, ArrowDownLeft, Bell } from 'lucide-react'
+import { format } from 'date-fns'
+import { ja } from 'date-fns/locale'
 
 interface Challenge {
   id: string
@@ -16,75 +18,115 @@ interface Challenge {
   completed_at: string | null
 }
 
-interface Transaction {
+interface Payment {
   id: string
-  type: 'penalty' | 'refund' | 'bonus'
+  amount: number
+  status: string
+  created_at: string
+  challenge_id: string
+  challenges?: Challenge
+}
+
+interface HistoryItem {
+  id: string
+  type: 'penalty' | 'success'
   amount: number
   description: string
   date: string
-  recipient?: string
+  target_address: string
+  status: string
 }
 
 export default function HistoryPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  
-  // Mock transaction data
-  const [transactions] = useState<Transaction[]>([
-    {
-      id: '1',
-      type: 'penalty',
-      amount: 1923,
-      description: 'チャレンジ失敗ペナルティ',
-      date: 'Nov 12',
-      recipient: 'Ada Femi'
-    },
-    {
-      id: '2',
-      type: 'refund',
-      amount: 1532,
-      description: 'チャレンジ成功リファンド',
-      date: 'Nov 14',
-      recipient: 'Musa Adebayor'
-    },
-    {
-      id: '3',
-      type: 'penalty',
-      amount: 950,
-      description: 'チャレンジ失敗ペナルティ',
-      date: 'Nov 12',
-      recipient: 'Nneka Malik'
-    },
-    {
-      id: '4',
-      type: 'penalty',
-      amount: 190,
-      description: 'チャレンジ失敗ペナルティ',
-      date: 'May 26',
-      recipient: 'Tunde Ugo'
-    }
-  ])
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([])
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    setTimeout(() => setLoading(false), 1000)
-  }, [])
+    const loadHistory = async () => {
+      try {
+        const currentUser = await getCurrentUser()
+        if (!currentUser) {
+          router.push('/login')
+          return
+        }
+        setUser(currentUser)
 
-  const getTransactionIcon = (type: 'penalty' | 'refund' | 'bonus') => {
-    if (type === 'refund') {
+        const supabase = createClientSideClient()
+        if (!supabase) {
+          console.error('Failed to create Supabase client')
+          return
+        }
+        
+        // Fetch challenges with payment data
+        const { data: challenges, error: challengesError } = await supabase
+          .from('challenges')
+          .select(`
+            id,
+            target_address,
+            penalty_amount,
+            status,
+            created_at,
+            completed_at,
+            target_time,
+            payments!inner(
+              amount,
+              status,
+              created_at
+            )
+          `)
+          .eq('user_id', currentUser.id)
+          .order('created_at', { ascending: false })
+
+        if (challengesError) {
+          console.error('Error fetching challenges:', challengesError)
+          return
+        }
+
+        // Transform data for history display
+        const items: HistoryItem[] = (challenges || []).map(challenge => {
+          const payment = Array.isArray(challenge.payments) ? challenge.payments[0] : challenge.payments
+          const isSuccess = challenge.status === 'completed'
+          
+          return {
+            id: challenge.id,
+            type: isSuccess ? 'success' : 'penalty',
+            amount: payment?.amount || challenge.penalty_amount,
+            description: isSuccess ? 'チャレンジ成功' : 'チャレンジ失敗ペナルティ',
+            date: format(new Date(challenge.completed_at || challenge.created_at), 'M月d日', { locale: ja }),
+            target_address: formatAddress(challenge.target_address),
+            status: challenge.status
+          }
+        })
+
+        setHistoryItems(items)
+      } catch (error) {
+        console.error('Error loading history:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadHistory()
+  }, [router])
+
+  const getTransactionIcon = (type: 'penalty' | 'success') => {
+    if (type === 'success') {
       return <ArrowDownLeft size={20} className="text-green-600" />
     }
-    return <ArrowUpRight size={20} className="text-gray-600" />
+    return <ArrowUpRight size={20} className="text-red-600" />
   }
 
-  const getTransactionColor = (type: 'penalty' | 'refund' | 'bonus') => {
-    if (type === 'refund') {
+  const getTransactionColor = (type: 'penalty' | 'success') => {
+    if (type === 'success') {
       return 'text-green-600'
     }
-    return 'text-gray-900'
+    return 'text-red-600'
   }
 
-  const formatAmount = (amount: number, type: 'penalty' | 'refund' | 'bonus') => {
-    const sign = type === 'refund' ? '+' : '-'
+  const formatAmount = (amount: number, type: 'penalty' | 'success') => {
+    const sign = type === 'success' ? '+' : '-'
     return `${sign}¥${amount.toLocaleString()}`
   }
 
@@ -124,31 +166,37 @@ export default function HistoryPage() {
             </button>
           </div>
 
-          {/* Transaction List */}
+          {/* History List */}
           <div className="space-y-3">
-            {transactions.map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center">
-                    {getTransactionIcon(transaction.type)}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white text-sm">
-                      {transaction.recipient}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {transaction.description} • {transaction.date}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className={`font-semibold text-sm ${getTransactionColor(transaction.type)}`}>
-                    {formatAmount(transaction.amount, transaction.type)}
-                  </p>
-                  <p className="text-xs text-gray-400">¥{(transaction.amount * 0.76).toLocaleString()}</p>
-                </div>
+            {historyItems.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                まだチャレンジ履歴がありません
               </div>
-            ))}
+            ) : (
+              historyItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center">
+                      {getTransactionIcon(item.type)}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white text-sm">
+                        {item.target_address}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {item.description} • {item.date}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-semibold text-sm ${getTransactionColor(item.type)}`}>
+                      {formatAmount(item.amount, item.type)}
+                    </p>
+                    <p className="text-xs text-gray-400 capitalize">{item.status}</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

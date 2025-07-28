@@ -11,6 +11,15 @@ const nextConfig = {
   
   // Optimize webpack configuration
   webpack: (config, { dev, isServer }) => {
+    // Configure cache to handle big strings warning
+    if (dev) {
+      config.cache = {
+        type: 'filesystem',
+        compression: 'gzip',
+        maxMemoryGenerations: 1,
+      }
+    }
+    
     // Prevent chunk loading errors
     if (!dev && !isServer) {
       config.optimization.splitChunks = {

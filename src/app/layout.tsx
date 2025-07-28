@@ -3,11 +3,13 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import Navigation from '@/components/Navigation'
+import DatabaseSetup from '@/components/DatabaseSetup'
 import React from 'react'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
   title: 'Meza - 位置ベースペナルティアラーム',
   description: '朝活をサポートする位置ベースペナルティアラームアプリ - 起床時刻に指定場所に移動しないとペナルティが発生',
   authors: [{ name: 'Meza Team' }],
@@ -123,6 +125,7 @@ export default function RootLayout({
       <body className={`${inter.className} antialiased min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
         <ErrorBoundary>
           <GlobalErrorHandler>
+            <DatabaseSetup />
             <Navigation>
               {children}
             </Navigation>

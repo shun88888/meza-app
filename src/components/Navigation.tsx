@@ -161,14 +161,14 @@ export default function Navigation({ children }: NavigationProps) {
   return (
     <div className="min-h-screen bg-white dark:bg-black">
       {/* Main Content */}
-      <main className="pb-20 min-h-screen">
+      <main className="pb-16 min-h-screen">
         {children}
       </main>
 
       {/* Bottom Navigation - Only show for authenticated users */}
       {user && (
         <div className="fixed bottom-0 left-0 right-0 pb-safe">
-          <div className="flex justify-center py-3">
+          <div className="flex justify-center py-2">
             <div className="w-full max-w-sm">
               <div onClick={(e) => {
                 const target = e.target as HTMLElement;

@@ -356,7 +356,7 @@ export default function CreateChallengePage() {
     // Check if user has payment method registered
     if (!challengeData.selectedPaymentMethodId || paymentMethods.length === 0) {
       alert('チャレンジを開始するには、クレジットカードの登録が必要です。支払い方法を設定してください。')
-      router.push('/create-challenge/payment')
+      router.push('/settings/payment')
       return
     }
 
@@ -565,7 +565,7 @@ export default function CreateChallengePage() {
             <button 
               className="w-full flex items-center h-12 px-4 hover:bg-gray-50 transition-colors duration-50"
               onClick={() => {
-                router.push('/create-challenge/payment')
+                router.push('/settings/payment')
               }}
             >
               <div className="w-16 text-xs text-gray-500 tracking-wide">支払方法</div>

@@ -3,52 +3,59 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/supabase'
+import { getPaymentMethods, PaymentMethodInfo } from '@/lib/stripe'
 import { ArrowDownLeft, CreditCard, Plus, Trash2 } from 'lucide-react'
 
-interface PaymentMethod {
-  id: string
-  type: 'visa' | 'mastercard' | 'jcb' | 'amex'
-  last4: string
-  expiryMonth: number
-  expiryYear: number
-  isDefault: boolean
-}
+// Remove custom interface, use the one from stripe lib
 
 export default function PaymentMethodPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
-    {
-      id: '1',
-      type: 'visa',
-      last4: '4242',
-      expiryMonth: 12,
-      expiryYear: 2027,
-      isDefault: true
-    },
-    {
-      id: '2',
-      type: 'mastercard',
-      last4: '5555',
-      expiryMonth: 8,
-      expiryYear: 2026,
-      isDefault: false
-    }
-  ])
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodInfo[]>([])
   const router = useRouter()
 
-  useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const currentUser = await getCurrentUser()
-        setUser(currentUser)
-      } catch (error) {
-        console.error('Error checking user:', error)
-      } finally {
-        setLoading(false)
+  const loadPaymentMethods = async () => {
+    try {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+      
+      if (currentUser) {
+        // 新しいAPIエンドポイントを使用
+        try {
+          const response = await fetch('/api/payment-methods')
+          if (response.ok) {
+            const data = await response.json()
+            setPaymentMethods(data.paymentMethods)
+          } else {
+            // フォールバック: 既存のAPIを使用
+            const methods = await getPaymentMethods(currentUser.id)
+            setPaymentMethods(methods.paymentMethods)
+          }
+        } catch {
+          // フォールバック: 既存のAPIを使用
+          const methods = await getPaymentMethods(currentUser.id)
+          setPaymentMethods(methods.paymentMethods)
+        }
       }
+    } catch (error) {
+      console.error('Error loading payment methods:', error)
+    } finally {
+      setLoading(false)
     }
-    checkUser()
+  }
+
+  useEffect(() => {
+    loadPaymentMethods()
+  }, [])
+
+  // ページがフォーカスされたときにデータを再読み込み
+  useEffect(() => {
+    const handleFocus = () => {
+      loadPaymentMethods()
+    }
+    
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [])
 
   const getCardIcon = (type: string) => {
@@ -66,8 +73,8 @@ export default function PaymentMethodPage() {
     }
   }
 
-  const getCardName = (type: string) => {
-    switch (type) {
+  const getCardName = (brand: string) => {
+    switch (brand?.toLowerCase()) {
       case 'visa':
         return 'Visa'
       case 'mastercard':
@@ -82,41 +89,57 @@ export default function PaymentMethodPage() {
   }
 
   const handleSetDefault = (id: string) => {
-    setPaymentMethods(prev => 
-      prev.map(method => ({
-        ...method,
-        isDefault: method.id === id
-      }))
-    )
+    // TODO: Implement API call to set default payment method
+    console.log('Setting default payment method:', id)
   }
 
-  const handleRemove = (id: string) => {
-    if (confirm('このカードを削除しますか？')) {
-      setPaymentMethods(prev => prev.filter(method => method.id !== id))
+  const handleRemove = async (id: string) => {
+    if (!confirm('このカードを削除しますか？')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/payment-methods?id=${id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        alert('カードを削除しました')
+        // データを再読み込み
+        loadPaymentMethods()
+      } else {
+        const error = await response.json()
+        alert(`エラー: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Payment method deletion error:', error)
+      alert('カードの削除に失敗しました')
     }
   }
 
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-900 dark:text-white text-lg">読み込み中...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-900 text-lg">読み込み中...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-md mx-auto bg-white dark:bg-gray-800 min-h-screen">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-md mx-auto bg-white min-h-screen">
         {/* Header */}
-        <div className="px-4 py-6 border-b border-gray-100 dark:border-gray-700">
+        <div className="px-4 py-6 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <button 
               onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <ArrowDownLeft size={20} className="text-gray-600 dark:text-gray-400 rotate-45" />
+              <ArrowDownLeft size={20} className="text-gray-600 rotate-45" />
             </button>
-            <h1 className="text-lg font-medium text-gray-900 dark:text-white">決済方法</h1>
+            <h1 className="text-lg font-medium text-gray-900">決済方法</h1>
             <div className="w-8" /> {/* Spacer */}
           </div>
         </div>
@@ -125,14 +148,17 @@ export default function PaymentMethodPage() {
         <div className="p-4 pb-6">
           {/* Add Payment Method */}
           <div className="mb-4">
-            <button className="w-full flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border-2 border-dashed border-gray-300 dark:border-gray-600">
+            <button 
+              onClick={() => router.push('/settings/payment/add')}
+              className="w-full flex items-center justify-center p-4 bg-[#FFF9E6] hover:bg-[#FFE72E]/20 rounded-2xl transition-colors border border-[#FFE72E]/30"
+            >
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center">
-                  <Plus size={20} className="text-gray-600" />
+                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+                  <Plus size={20} className="text-gray-800" />
                 </div>
                 <div className="text-left">
-                  <p className="font-medium text-gray-900 dark:text-white text-sm">新しいカードを追加</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">クレジットカード・デビットカード</p>
+                  <p className="font-medium text-gray-900 text-sm">新しいカードを追加</p>
+                  <p className="text-xs text-gray-700">クレジットカード・デビットカード</p>
                 </div>
               </div>
             </button>
@@ -141,38 +167,38 @@ export default function PaymentMethodPage() {
           {/* Payment Methods */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">登録済みカード</h2>
+              <h2 className="text-lg font-semibold text-gray-900">登録済みカード</h2>
             </div>
             <div className="space-y-3">
-              {paymentMethods.map((method) => (
-                <div key={method.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+              {paymentMethods.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">登録済みのカードがありません</p>
+                  <p className="text-sm text-gray-400 mt-1">上のボタンから新しいカードを追加してください</p>
+                </div>
+              ) : (
+                paymentMethods.map((method) => (
+                <div key={method.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center">
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-gray-200">
                       <CreditCard size={20} className="text-gray-600" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white text-sm">
-                        {getCardName(method.type)} •••• {method.last4}
-                        {method.isDefault && (
-                          <span className="ml-2 px-2 py-0.5 bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs rounded">
-                            デフォルト
-                          </span>
-                        )}
+                      <p className="font-medium text-gray-900 text-sm">
+                        {getCardName(method.card?.brand || '')} •••• {method.card?.last4}
+                        {/* TODO: Add default payment method indicator when API supports it */}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        有効期限: {method.expiryMonth.toString().padStart(2, '0')}/{method.expiryYear}
+                      <p className="text-xs text-gray-500">
+                        有効期限: {method.card?.exp_month?.toString().padStart(2, '0')}/{method.card?.exp_year}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {!method.isDefault && (
-                      <button
-                        onClick={() => handleSetDefault(method.id)}
-                        className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                      >
-                        デフォルトに設定
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleSetDefault(method.id)}
+                      className="text-xs text-[#FFAD2F] hover:text-[#FF8A00] font-medium"
+                    >
+                      デフォルトに設定
+                    </button>
                     <button
                       onClick={() => handleRemove(method.id)}
                       className="p-1 text-red-600 hover:text-red-700"
@@ -181,14 +207,16 @@ export default function PaymentMethodPage() {
                     </button>
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
+
           {/* Payment Info */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4">
-            <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">決済について</h3>
-            <div className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
+          <div className="bg-[#FFF9E6] rounded-2xl p-4 border border-[#FFE72E]/30">
+            <h3 className="font-semibold text-gray-900 mb-2">決済について</h3>
+            <div className="space-y-2 text-sm text-gray-700">
               <p>• チャレンジに失敗した場合のみ、設定したペナルティ金額が決済されます</p>
               <p>• 成功し続ける限り、費用は発生しません</p>
               <p>• 決済情報はStripeを通じて安全に処理されます</p>
