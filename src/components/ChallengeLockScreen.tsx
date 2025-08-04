@@ -253,18 +253,20 @@ export default function ChallengeLockScreen({
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden z-50">
+    <div 
+      className="fixed inset-0 bg-white text-black overflow-hidden z-50"
+    >
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+          backgroundImage: 'radial-gradient(circle at 25% 25%, rgba(0,0,0,0.05) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(0,0,0,0.05) 0%, transparent 50%)',
           backgroundSize: '50px 50px'
         }} />
       </div>
 
       {/* Status Bar */}
       <div className="absolute top-0 left-0 right-0 pt-safe px-6 py-4 text-center">
-        <div className="text-white/60 text-sm">チャレンジ実行中</div>
+        <div className="text-gray-600 text-sm">チャレンジ実行中</div>
       </div>
 
       {/* Main Content */}
@@ -274,14 +276,14 @@ export default function ChallengeLockScreen({
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/10 backdrop-blur-md rounded-3xl p-8 mb-12 w-full max-w-sm border border-white/20 shadow-lg"
+          className="bg-white rounded-3xl p-8 mb-12 w-full max-w-sm shadow-lg"
         >
           <div className="text-center">
-            <div className="text-white/60 text-sm mb-4 font-medium">現在時刻</div>
-            <div className="text-5xl font-light tracking-wider mb-4 text-white">
+            <div className="text-gray-600 text-sm mb-4 font-medium">現在時刻</div>
+            <div className="text-5xl font-light tracking-wider mb-4 text-black">
               {formatTime(currentTime)}
             </div>
-            <div className="text-white/60 text-sm">
+            <div className="text-gray-600 text-sm">
               {formatDate(currentTime)}
             </div>
           </div>
@@ -292,23 +294,23 @@ export default function ChallengeLockScreen({
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
-          className="bg-white/10 backdrop-blur-md rounded-3xl p-8 mb-12 w-full max-w-sm border border-white/20 shadow-lg"
+          className="bg-white rounded-3xl p-8 mb-12 w-full max-w-sm shadow-lg"
         >
           <div className="text-center">
-            <div className="text-white/60 text-sm mb-4 font-medium">目覚まし時間まで</div>
-            <div className="text-3xl font-light mb-6 text-white">{timeUntilWakeUp}</div>
+            <div className="text-gray-600 text-sm mb-4 font-medium">目覚まし時間まで</div>
+            <div className="text-3xl font-light mb-6 text-black">{timeUntilWakeUp}</div>
             
             {/* Progress Bar */}
-            <div className="w-full bg-white/20 rounded-full h-2 mb-6">
+            <div className="w-full bg-gray-100 rounded-full h-2 mb-6">
               <motion.div
-                className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full"
+                className="bg-yellow-400 h-2 rounded-full"
                 initial={{ width: 0 }}
                 animate={{ width: `${challengeProgress}%` }}
                 transition={{ duration: 0.5 }}
               />
             </div>
 
-            <div className="text-white/60 text-sm">
+            <div className="text-gray-600 text-sm">
               目標: {challengeData.wakeUpLocation?.address || '設定された場所'}
             </div>
           </div>
@@ -332,7 +334,7 @@ export default function ChallengeLockScreen({
               {!showPasscodeInput ? (
                 <button
                   onClick={() => setShowPasscodeInput(true)}
-                  className="text-white/70 text-sm hover:text-white transition-colors"
+                  className="text-gray-600 text-sm hover:text-black transition-colors"
                 >
                   パスコードで解除
                 </button>
@@ -415,12 +417,12 @@ function SlideToUnlock({ onUnlock }: SlideToUnlockProps) {
   }, [onUnlock, isCompleted])
 
   return (
-    <div className="relative bg-white/10 backdrop-blur-md rounded-full h-16 border border-white/20 overflow-hidden">
+    <div className="relative bg-gray-50 rounded-full h-16 overflow-hidden shadow-inner">
       {/* Track */}
       <div className="absolute inset-0 flex items-center px-6">
-        <div className="text-white/70 text-sm">スライドして解除</div>
+        <div className="text-gray-600 text-sm">スライドして解除</div>
         <div className="ml-auto">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="white" opacity="0.7">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="text-gray-600">
             <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
           </svg>
         </div>
@@ -428,7 +430,7 @@ function SlideToUnlock({ onUnlock }: SlideToUnlockProps) {
 
       {/* Slider */}
       <motion.div
-        className="absolute left-2 top-2 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing"
+        className="absolute left-2 top-2 w-12 h-12 bg-yellow-400 rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing"
         drag="x"
         dragConstraints={{ left: 0, right: 200 }}
         dragElastic={0.1}

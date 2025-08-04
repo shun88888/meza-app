@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClientSideClient } from '@/lib/supabase'
@@ -11,22 +11,42 @@ export default function SignupPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: '',
     name: '',
-    agreeToTerms: false
+    dateOfBirth: ''
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // Set yellow theme color for signup page
+  useEffect(() => {
+    if (!isClient) return
+    
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', '#F5D916')
+    } else {
+      const meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      meta.content = '#F5D916'
+      document.head.appendChild(meta)
+    }
+  }, [isClient])
 
   // Early return after hooks if supabase is not available
   if (!supabase) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-yellow-400 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          <h1 className="text-2xl font-bold text-black mb-4">
             サービスが利用できません
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-800">
             しばらく時間をおいてから再度お試しください。
           </p>
         </div>
@@ -40,7 +60,7 @@ export default function SignupPage() {
   }
 
   const validatePassword = (password: string) => {
-    return password.length >= 8 && /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)
+    return password.length >= 6
   }
 
   const validateForm = () => {
@@ -59,15 +79,11 @@ export default function SignupPage() {
     if (!formData.password) {
       newErrors.password = 'パスワードを入力してください'
     } else if (!validatePassword(formData.password)) {
-      newErrors.password = 'パスワードは8文字以上で、大文字・小文字・数字を含む必要があります'
+      newErrors.password = 'パスワードは6文字以上で入力してください'
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'パスワードが一致しません'
-    }
-
-    if (!formData.agreeToTerms) {
-      newErrors.agreeToTerms = '利用規約とプライバシーポリシーに同意してください'
+    if (!formData.dateOfBirth) {
+      newErrors.dateOfBirth = '生年月日を選択してください'
     }
 
     setErrors(newErrors)
@@ -88,6 +104,7 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: formData.name,
+            date_of_birth: formData.dateOfBirth,
           },
           emailRedirectTo: `${location.origin}/auth/callback`,
         },
@@ -110,7 +127,7 @@ export default function SignupPage() {
     }
   }
 
-  const handleInputChange = (field: string, value: string | boolean) => {
+  const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     // Clear error when user starts typing
     if (errors[field]) {
@@ -119,143 +136,152 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">アカウント作成</h1>
-          <p className="text-gray-600">Mezaアプリで起床チャレンジを始めましょう</p>
-        </div>
+    <div className="min-h-screen w-full bg-white relative overflow-hidden">
+      {/* Back button */}
+      <div className="absolute top-8 left-8 z-20">
+        <Link href="/login">
+          <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center hover:bg-yellow-500 transition-colors shadow-lg">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+              <path d="m15 18-6-6 6-6"/>
+            </svg>
+          </div>
+        </Link>
+      </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* General Error */}
-          {errors.general && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 text-sm">{errors.general}</p>
-            </div>
-          )}
+      {/* Bottom curved yellow section */}
+      <div 
+        className="absolute bottom-0 left-0 w-full bg-yellow-400"
+        style={{
+          height: '25%',
+          borderRadius: '50% 50% 0 0 / 100% 100% 0 0'
+        }}
+      ></div>
 
-          {/* Name */}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              お名前
-            </label>
-            <input
-              type="text"
-              id="name"
-              value={formData.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#FFAD2F] focus:border-transparent transition-colors ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="田中太郎"
-            />
-            {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+      {/* Main content */}
+      <div className="relative z-10 flex items-center justify-center min-h-screen">
+        <div className="w-full max-w-sm px-8">
+          {/* Header */}
+          <div className="mb-10 text-center">
+            <h1 className="text-4xl font-bold text-black mb-1 leading-tight">Create new</h1>
+            <h2 className="text-4xl font-bold text-black mb-4 leading-tight">Account</h2>
+            <p className="text-gray-600 text-sm">
+              Already Registered? <Link href="/login" className="text-black font-medium hover:underline">Log in here.</Link>
+            </p>
           </div>
 
-          {/* Email */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              メールアドレス
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#FFAD2F] focus:border-transparent transition-colors ${
-                errors.email ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="example@email.com"
-            />
-            {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
-          </div>
-
-          {/* Password */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-              パスワード
-            </label>
-            <input
-              type="password"
-              id="password"
-              value={formData.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#FFAD2F] focus:border-transparent transition-colors ${
-                errors.password ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="8文字以上（大文字・小文字・数字を含む）"
-            />
-            {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
-          </div>
-
-          {/* Confirm Password */}
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-              パスワード確認
-            </label>
-            <input
-              type="password"
-              id="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#FFAD2F] focus:border-transparent transition-colors ${
-                errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="パスワードを再入力"
-            />
-            {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
-          </div>
-
-          {/* Terms Agreement */}
-          <div>
-            <label className="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                checked={formData.agreeToTerms}
-                onChange={(e) => handleInputChange('agreeToTerms', e.target.checked)}
-                className="mt-1 h-4 w-4 text-[#FFAD2F] focus:ring-[#FFAD2F] border-gray-300 rounded"
-              />
-              <span className="text-sm text-gray-700">
-                <Link href="/terms" className="text-[#FFAD2F] hover:underline">利用規約</Link>
-                および
-                <Link href="/privacy" className="text-[#FFAD2F] hover:underline">プライバシーポリシー</Link>
-                に同意します
-              </span>
-            </label>
-            {errors.agreeToTerms && <p className="mt-1 text-sm text-red-600">{errors.agreeToTerms}</p>}
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-              isLoading
-                ? 'bg-gray-400 text-white cursor-not-allowed'
-                : 'bg-[#FFAD2F] hover:bg-[#FF9A1F] text-white'
-            }`}
-          >
-            {isLoading ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                アカウント作成中...
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* General Error */}
+            {errors.general && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-red-700 text-sm">{errors.general}</p>
               </div>
-            ) : (
-              'アカウントを作成'
             )}
-          </button>
-        </form>
 
-        {/* Login Link */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-600">
-            すでにアカウントをお持ちですか？
-            <Link href="/login" className="text-[#FFAD2F] hover:underline ml-1">
-              ログイン
-            </Link>
-          </p>
+            {/* Name field */}
+            <div>
+              <label className="block text-xs font-semibold text-black mb-2 uppercase tracking-wider">NAME</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                placeholder="Jiara Martins"
+                className={`w-full px-5 py-4 bg-gray-200 rounded-xl border-0 text-black placeholder-gray-600 focus:outline-none focus:bg-gray-300 transition-all duration-200 ${
+                  errors.name ? 'bg-red-100 ring-2 ring-red-400' : ''
+                }`}
+                required
+              />
+              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+            </div>
+
+            {/* Email field */}
+            <div>
+              <label className="block text-xs font-semibold text-black mb-2 uppercase tracking-wider">EMAIL</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="hello@reallygreatsite.com"
+                className={`w-full px-5 py-4 bg-gray-200 rounded-xl border-0 text-black placeholder-gray-600 focus:outline-none focus:bg-gray-300 transition-all duration-200 ${
+                  errors.email ? 'bg-red-100 ring-2 ring-red-400' : ''
+                }`}
+                required
+              />
+              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+            </div>
+
+            {/* Password field */}
+            <div>
+              <label className="block text-xs font-semibold text-black mb-2 uppercase tracking-wider">PASSWORD</label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
+                placeholder="••••••"
+                className={`w-full px-5 py-4 bg-gray-200 rounded-xl border-0 text-black placeholder-gray-600 focus:outline-none focus:bg-gray-300 transition-all duration-200 ${
+                  errors.password ? 'bg-red-100 ring-2 ring-red-400' : ''
+                }`}
+                required
+              />
+              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
+            </div>
+
+            {/* Date of Birth field */}
+            <div>
+              <label className="block text-xs font-semibold text-black mb-2 uppercase tracking-wider">DATE OF BIRTH</label>
+              <div className="relative">
+                <select
+                  value={formData.dateOfBirth}
+                  onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                  className={`w-full px-5 py-4 bg-gray-200 rounded-xl border-0 text-black appearance-none focus:outline-none focus:bg-gray-300 transition-all duration-200 ${
+                    errors.dateOfBirth ? 'bg-red-100 ring-2 ring-red-400' : ''
+                  } ${!formData.dateOfBirth ? 'text-gray-600' : ''}`}
+                  required
+                >
+                  <option value="" disabled>Select</option>
+                  <option value="2005">2005年生まれ</option>
+                  <option value="2004">2004年生まれ</option>
+                  <option value="2003">2003年生まれ</option>
+                  <option value="2002">2002年生まれ</option>
+                  <option value="2001">2001年生まれ</option>
+                  <option value="2000">2000年生まれ</option>
+                  <option value="1999">1999年生まれ</option>
+                  <option value="1998">1998年生まれ</option>
+                  <option value="1997">1997年生まれ</option>
+                  <option value="1996">1996年生まれ</option>
+                  <option value="1995">1995年生まれ</option>
+                  <option value="1994">1994年生まれ</option>
+                  <option value="1993">1993年生まれ</option>
+                  <option value="1992">1992年生まれ</option>
+                  <option value="1991">1991年生まれ</option>
+                  <option value="1990">1990年生まれ</option>
+                  <option value="other">その他</option>
+                </select>
+                {/* Custom dropdown arrow */}
+                <div className="absolute inset-y-0 right-0 flex items-center pr-5 pointer-events-none">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
+              </div>
+              {errors.dateOfBirth && <p className="mt-1 text-sm text-red-600">{errors.dateOfBirth}</p>}
+            </div>
+
+            {/* Sign up button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full mt-8 py-4 bg-gray-800 text-white rounded-xl font-semibold text-lg hover:bg-gray-900 transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  作成中...
+                </div>
+              ) : (
+                'Sign up'
+              )}
+            </button>
+          </form>
         </div>
       </div>
     </div>

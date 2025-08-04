@@ -309,7 +309,11 @@
 }
 
 .bg-gradient-active {
-  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  background: linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%);
+}
+
+.bg-gradient-main {
+  background: linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%);
 }
 
 /* Modern Mobile Menu Styles */

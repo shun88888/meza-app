@@ -253,10 +253,18 @@ export default function CreateChallengePage() {
     // 目覚時間の更新
     const wakeTime = searchParams.get('wakeTime')
     if (wakeTime) {
-      setChallengeData(prev => ({
-        ...prev,
-        wakeTime: decodeURIComponent(wakeTime)
-      }))
+      try {
+        const decodedTime = decodeURIComponent(wakeTime)
+        const date = new Date(decodedTime)
+        if (!isNaN(date.getTime())) {
+          setChallengeData(prev => ({
+            ...prev,
+            wakeTime: date.toISOString()
+          }))
+        }
+      } catch (error) {
+        console.error('Error parsing wake time parameter:', error)
+      }
     }
 
     // 起床場所情報の更新

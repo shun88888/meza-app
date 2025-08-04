@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { signInWithEmail, signUpWithEmail } from '@/lib/supabase'
+import Link from 'next/link'
+import { signInWithEmail } from '@/lib/supabase'
 
 function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true)
-  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -20,22 +18,20 @@ function LoginPage() {
     setIsClient(true)
   }, [])
   
-  // Set white theme color for login page
+  // Set yellow theme color for login page
   useEffect(() => {
     if (!isClient) return
     
     const metaThemeColor = document.querySelector('meta[name="theme-color"]')
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', '#ffffff')
+      metaThemeColor.setAttribute('content', '#F5D916')
     } else {
       const meta = document.createElement('meta')
       meta.name = 'theme-color'
-      meta.content = '#ffffff'
+      meta.content = '#F5D916'
       document.head.appendChild(meta)
     }
   }, [isClient])
-  
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,13 +39,8 @@ function LoginPage() {
     setError('')
 
     try {
-      if (isLogin) {
-        const { error } = await signInWithEmail(email, password)
-        if (error) throw error
-      } else {
-        const { error } = await signUpWithEmail(email, password)
-        if (error) throw error
-      }
+      const { error } = await signInWithEmail(name, password)
+      if (error) throw error
       router.push('/')
     } catch (error: any) {
       setError(error.message || 'エラーが発生しました')
@@ -58,92 +49,142 @@ function LoginPage() {
     }
   }
 
-
   return (
-    <div className="h-screen-mobile w-full max-w-full overflow-hidden bg-gray-50 flex items-center justify-center px-4 fixed inset-0">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Meza</h1>
-          <p className="mt-2 text-gray-600">
-            位置ベースペナルティアラームアプリ
-          </p>
-        </div>
+    <div className="min-h-screen w-full bg-white relative overflow-hidden">
+      {/* Header with company name */}
+      <div className="absolute top-8 left-8 z-10">
+        <h2 className="text-lg font-semibold text-black">Aizen Finance</h2>
+      </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex space-x-1 mb-6">
-            <button
-              onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium ${
-                isLogin
-                  ? 'bg-timee-orange text-white'
-                  : 'bg-gray-100 text-gray-700'
-              }`}
-            >
-              ログイン
-            </button>
-            <button
-              onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium ${
-                !isLogin
-                  ? 'bg-timee-orange text-white'
-                  : 'bg-gray-100 text-gray-700'
-              }`}
-            >
-              新規登録
-            </button>
+      {/* Decorative animated element */}
+      <div className="absolute top-16 right-8 z-10">
+        <div className="w-24 h-24">
+          <svg viewBox="0 0 100 100" className="w-full h-full">
+            <path 
+              d="M 20 50 Q 40 20, 60 50 T 100 50" 
+              stroke="#FFD93D" 
+              strokeWidth="8" 
+              fill="none"
+            />
+            <circle cx="15" cy="50" r="10" fill="#FFD93D">
+              <animateTransform 
+                attributeName="transform" 
+                type="rotate" 
+                from="0 15 50" 
+                to="360 15 50" 
+                dur="3s" 
+                repeatCount="indefinite"
+              />
+            </circle>
+            <g transform="translate(15, 50)">
+              <circle cx="-10" cy="0" r="2" fill="#FFD93D"/>
+              <circle cx="10" cy="0" r="2" fill="#FFD93D"/>
+              <circle cx="0" cy="-10" r="2" fill="#FFD93D"/>
+              <circle cx="0" cy="10" r="2" fill="#FFD93D"/>
+              <circle cx="-7" cy="-7" r="2" fill="#FFD93D"/>
+              <circle cx="7" cy="-7" r="2" fill="#FFD93D"/>
+              <circle cx="-7" cy="7" r="2" fill="#FFD93D"/>
+              <circle cx="7" cy="7" r="2" fill="#FFD93D"/>
+            </g>
+            <circle cx="100" cy="50" r="10" fill="#FFD93D">
+              <animateTransform 
+                attributeName="transform" 
+                type="rotate" 
+                from="0 100 50" 
+                to="360 100 50" 
+                dur="3s" 
+                repeatCount="indefinite"
+              />
+            </circle>
+            <g transform="translate(100, 50)">
+              <circle cx="-10" cy="0" r="2" fill="#FFD93D"/>
+              <circle cx="10" cy="0" r="2" fill="#FFD93D"/>
+              <circle cx="0" cy="-10" r="2" fill="#FFD93D"/>
+              <circle cx="0" cy="10" r="2" fill="#FFD93D"/>
+              <circle cx="-7" cy="-7" r="2" fill="#FFD93D"/>
+              <circle cx="7" cy="-7" r="2" fill="#FFD93D"/>
+              <circle cx="-7" cy="7" r="2" fill="#FFD93D"/>
+              <circle cx="7" cy="7" r="2" fill="#FFD93D"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      {/* Yellow curved section */}
+      <div 
+        className="absolute bottom-0 left-0 w-full bg-yellow-400"
+        style={{
+          height: '60%',
+          borderRadius: '40px 40px 0 0',
+          clipPath: 'ellipse(100% 100% at 50% 100%)'
+        }}
+      ></div>
+
+      {/* Main content container */}
+      <div className="relative z-10 flex items-end justify-center min-h-screen">
+        <div className="w-full max-w-sm px-8 pb-12">
+          {/* Login content */}
+          <div className="mb-8">
+            <h1 className="text-5xl font-bold text-black mb-3 leading-tight">Login</h1>
+            <p className="text-gray-700 text-lg">Sign in to continue.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Name field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                メールアドレス
-              </label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+              <label className="block text-xs font-semibold text-black mb-2 uppercase tracking-wider">NAME</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Jiara Martins"
+                className="w-full px-5 py-4 bg-white rounded-xl border-0 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm"
                 required
               />
             </div>
 
+            {/* Password field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                パスワード
-              </label>
-              <Input
-                id="password"
+              <label className="block text-xs font-semibold text-black mb-2 uppercase tracking-wider">PASSWORD</label>
+              <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="••••••"
+                className="w-full px-5 py-4 bg-white rounded-xl border-0 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm"
                 required
               />
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
-            <Button
+            {/* Login button */}
+            <button
               type="submit"
               disabled={loading}
-              className="w-full bg-timee-orange hover:bg-timee-orange-dark"
+              className="w-full mt-8 py-4 bg-gray-800 text-white rounded-xl font-semibold text-lg hover:bg-gray-900 transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
             >
-              {loading ? '処理中...' : isLogin ? 'ログイン' : '新規登録'}
-            </Button>
+              {loading ? '処理中...' : 'Log in'}
+            </button>
           </form>
-        </div>
 
-        <div className="text-center text-sm text-gray-600">
-          <p>
-            継続してご利用いただくことで、
-            <br />
-            利用規約とプライバシーポリシーに同意したものとみなします。
-          </p>
+          {/* Links */}
+          <div className="mt-8 text-center space-y-1">
+            <p className="text-gray-700 text-sm">
+              <Link href="/auth/forgot-password" className="hover:underline">
+                Forgot Password?
+              </Link>
+            </p>
+            <p className="text-gray-700 text-sm">
+              <Link href="/signup" className="hover:underline">
+                Signup !
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

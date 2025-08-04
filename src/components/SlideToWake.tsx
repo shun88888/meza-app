@@ -39,8 +39,17 @@ const SlideToWake = forwardRef<SlideToWakeRef, SlideToWakeProps>(({
   }))
 
   useEffect(() => {
-    if (containerRef.current) {
-      setContainerWidth(containerRef.current.offsetWidth)
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth)
+      }
+    }
+    
+    updateWidth()
+    window.addEventListener('resize', updateWidth)
+    
+    return () => {
+      window.removeEventListener('resize', updateWidth)
     }
   }, [])
 
@@ -95,8 +104,8 @@ const SlideToWake = forwardRef<SlideToWakeRef, SlideToWakeProps>(({
     }
 
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('touchmove', handleTouchMove)
+      document.addEventListener('mousemove', handleMouseMove, { passive: false })
+      document.addEventListener('touchmove', handleTouchMove, { passive: false })
       document.addEventListener('mouseup', handleEnd)
       document.addEventListener('touchend', handleEnd)
     }
@@ -157,7 +166,7 @@ const SlideToWake = forwardRef<SlideToWakeRef, SlideToWakeProps>(({
       {/* Instruction text */}
       <div className="mt-4 text-center">
         <p className="text-sm text-gray-600">
-          右にスライドして{text === 'スライドで覚悟を決める' ? '覚悟を決めてください' : '解除してください'}
+          右にスライドして{text.includes('覚悟') ? '覚悟を決めてください' : '解除してください'}
         </p>
       </div>
     </div>

@@ -22,6 +22,23 @@ export default function HomePage() {
     
     setVH()
     window.addEventListener('resize', setVH)
+    
+    // Setup user profile if needed
+    const setupProfile = async () => {
+      try {
+        await fetch('/api/setup-profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+      } catch (error) {
+        console.error('Profile setup error:', error)
+      }
+    }
+    
+    setupProfile()
+    
     return () => window.removeEventListener('resize', setVH)
   }, [])
   
@@ -46,7 +63,20 @@ export default function HomePage() {
   }
 
   const handleStart = () => {
-    router.push('/create-challenge')
+    // Create wake time from current time settings
+    const now = new Date()
+    const targetTime = new Date()
+    targetTime.setHours(wakeTime.hours, wakeTime.minutes, 0, 0)
+    
+    // If the target time has already passed today, set it for tomorrow
+    if (targetTime <= now) {
+      targetTime.setDate(targetTime.getDate() + 1)
+    }
+    
+    const wakeTimeISO = targetTime.toISOString()
+    
+    // Pass wake time as URL parameter
+    router.push(`/create-challenge?wakeTime=${encodeURIComponent(wakeTimeISO)}`)
   }
 
   // Don't render until mounted to prevent hydration issues
@@ -138,13 +168,7 @@ export default function HomePage() {
           <div className="w-full">
             <button
               onClick={handleStart}
-              className="w-full h-14 text-lg font-semibold shadow-lg rounded-3xl transition-all duration-200"
-              style={{ 
-                backgroundColor: '#FFD400', 
-                color: 'black' 
-              }}
-              onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#FFC400'}
-              onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#FFD400'}
+              className="w-full h-14 text-lg font-semibold bg-yellow-400 hover:bg-yellow-500 text-white shadow-lg rounded-3xl transition-all duration-200"
             >
               チャレンジを開始
             </button>

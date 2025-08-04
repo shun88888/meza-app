@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { Database } from '@/types/database'
+import { createServerSideClient } from '@/lib/supabase-server'
 
 let stripe: Stripe | null = null
 
@@ -34,20 +32,42 @@ export async function POST(request: NextRequest) {
     }
 
     // Supabase client
-    const supabase = createServerComponentClient<Database>({ cookies })
+    const supabase = createServerSideClient()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     // Get user profile with Stripe customer ID
-    const { data: profile, error: profileError } = await supabase
+    let { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('stripe_customer_id, email')
       .eq('id', userId)
       .single()
 
+    // If profile doesn't exist, create it
     if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'ユーザープロファイルが見つかりません' },
-        { status: 404 }
-      )
+      const { data: insertedProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: user.email || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select('stripe_customer_id, email')
+        .single()
+
+      if (insertError) {
+        console.error('Failed to create profile:', insertError)
+        return NextResponse.json(
+          { error: 'プロファイルの作成に失敗しました' },
+          { status: 500 }
+        )
+      }
+
+      profile = insertedProfile
     }
 
     let customerId = profile.stripe_customer_id

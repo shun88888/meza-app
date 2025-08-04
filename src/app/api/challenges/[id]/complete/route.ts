@@ -17,7 +17,9 @@ export async function POST(
     const { 
       current_lat, 
       current_lng, 
-      current_address
+      current_address,
+      auto_charge = false,
+      is_success = null
     } = body
 
     // Validate required fields
@@ -51,23 +53,49 @@ export async function POST(
       return NextResponse.json({ error: 'Challenge already completed' }, { status: 400 })
     }
 
-    // Use Supabase function to complete the challenge
-    const { data: completionResult, error: completionError } = await supabase
-      .rpc('complete_challenge', {
-        challenge_id: params.id,
-        completion_lat_param: parseFloat(current_lat),
-        completion_lng_param: parseFloat(current_lng),
-        completion_address_param: current_address || null
-      })
+    let isSuccess: boolean
+    let distance: number
 
-    if (completionError) {
-      console.error('Error completing challenge:', completionError)
-      return NextResponse.json({ error: 'Failed to complete challenge' }, { status: 500 })
+    // If auto_charge is true, force the challenge to fail
+    if (auto_charge && is_success === false) {
+      // Update challenge status directly for auto-charge failures
+      const { error: updateError } = await supabase
+        .from('challenges')
+        .update({
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          completion_lat: parseFloat(current_lat),
+          completion_lng: parseFloat(current_lng),
+          completion_address: current_address || '起床時間経過のため自動失敗'
+        })
+        .eq('id', params.id)
+
+      if (updateError) {
+        console.error('Error updating challenge for auto-charge:', updateError)
+        return NextResponse.json({ error: 'Failed to update challenge' }, { status: 500 })
+      }
+
+      isSuccess = false
+      distance = 0 // Set distance to 0 for auto-charge failures
+    } else {
+      // Use normal Supabase function to complete the challenge
+      const { data: completionResult, error: completionError } = await supabase
+        .rpc('complete_challenge', {
+          challenge_id: params.id,
+          completion_lat_param: parseFloat(current_lat),
+          completion_lng_param: parseFloat(current_lng),
+          completion_address_param: current_address || null
+        })
+
+      if (completionError) {
+        console.error('Error completing challenge:', completionError)
+        return NextResponse.json({ error: 'Failed to complete challenge' }, { status: 500 })
+      }
+
+      const result = completionResult[0]
+      isSuccess = result.within_range
+      distance = result.distance_to_target
     }
-
-    const result = completionResult[0]
-    const isSuccess = result.within_range
-    const distance = result.distance_to_target
 
     // Get updated challenge data
     const { data: updatedChallenge, error: updateError } = await supabase
@@ -83,10 +111,12 @@ export async function POST(
 
     // Send notification
     try {
-      const notificationTitle = isSuccess ? 'チャレンジ成功！' : 'チャレンジ失敗'
+      const notificationTitle = isSuccess ? 'チャレンジ成功！' : (auto_charge ? 'チャレンジ自動失敗' : 'チャレンジ失敗')
       const notificationBody = isSuccess 
         ? `おめでとうございます！目標地点から${distance.toFixed(0)}m以内に到着しました。`
-        : `チャレンジが失敗しました。目標地点から${distance.toFixed(0)}m離れています。ペナルティ料金 ¥${challenge.penalty_amount.toLocaleString()} が発生します。`
+        : auto_charge 
+          ? `起床時間を過ぎたため、チャレンジが自動的に失敗しました。ペナルティ料金 ¥${challenge.penalty_amount.toLocaleString()} が自動決済されました。`
+          : `チャレンジが失敗しました。目標地点から${distance.toFixed(0)}m離れています。ペナルティ料金 ¥${challenge.penalty_amount.toLocaleString()} が発生します。`
       
       await supabase.rpc('send_notification', {
         user_id_param: user.id,
@@ -130,7 +160,7 @@ export async function POST(
       challenge: updatedChallenge,
       success: isSuccess,
       distance_to_target: distance,
-      within_range: result.within_range,
+      within_range: isSuccess,
       message: isSuccess ? 'Challenge completed successfully!' : 'Challenge failed, penalty applied.'
     })
   } catch (error) {

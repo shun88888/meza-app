@@ -132,7 +132,9 @@ export default function Navigation({ children }: NavigationProps) {
     '/auth/reset-password',
     '/onboarding',
     '/signup',
-    '/login'
+    '/login',
+    '/active-challenge',
+    '/challenge-failed'
   ].some(path => pathname.startsWith(path))
 
   // Show loading state while checking authentication
