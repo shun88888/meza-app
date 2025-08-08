@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
       penalty_amount,
       wake_up_location_address,
       wake_up_location_lat,
-      wake_up_location_lng
+      wake_up_location_lng,
+      status: requestedStatus
     } = body
 
     // Validate required fields
@@ -76,30 +77,58 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 })
     }
 
-    const { data: challenge, error } = await supabase
-      .from('challenges')
-      .insert([
-        {
-          user_id: user.id,
-          target_time,
-          home_address: home_address || '',
-          home_latitude: parseFloat(home_latitude),
-          home_longitude: parseFloat(home_longitude),
-          target_address: target_address || '',
-          target_latitude: parseFloat(target_latitude),
-          target_longitude: parseFloat(target_longitude),
-          penalty_amount: parseInt(penalty_amount),
-          wake_up_location_address,
-          wake_up_location_lat: wake_up_location_lat ? parseFloat(wake_up_location_lat) : null,
-          wake_up_location_lng: wake_up_location_lng ? parseFloat(wake_up_location_lng) : null,
-          status: 'pending'
-        }
-      ])
-      .select()
-      .single()
+    // First attempt: insert as-is
+    const basePayload = {
+      user_id: user.id,
+      target_time,
+      home_address: home_address || '',
+      home_latitude: parseFloat(home_latitude),
+      home_longitude: parseFloat(home_longitude),
+      target_address: target_address || '',
+      target_latitude: parseFloat(target_latitude),
+      target_longitude: parseFloat(target_longitude),
+      penalty_amount: parseInt(penalty_amount),
+      wake_up_location_address,
+      wake_up_location_lat: wake_up_location_lat ? parseFloat(wake_up_location_lat) : null,
+      wake_up_location_lng: wake_up_location_lng ? parseFloat(wake_up_location_lng) : null,
+      status: requestedStatus || 'pending'
+    }
 
-    if (error) {
-      console.error('Error creating challenge:', error)
+    let challengeInsertError: any | null = null
+    let challenge: any | null = null
+
+    {
+      const { data, error } = await supabase
+        .from('challenges')
+        .insert([ basePayload ])
+        .select()
+        .single()
+      challenge = data
+      challengeInsertError = error
+    }
+
+    // If type mismatch (TIME vs TIMESTAMPTZ), retry with HH:MM:SS
+    if (challengeInsertError && (challengeInsertError.code === '22007' || String(challengeInsertError.message || '').includes('type time'))) {
+      const d = new Date(target_time)
+      const hhmmss = [
+        String(d.getHours()).padStart(2, '0'),
+        String(d.getMinutes()).padStart(2, '0'),
+        String(d.getSeconds()).padStart(2, '0')
+      ].join(':')
+
+      const retryPayload = { ...basePayload, target_time: hhmmss }
+      const { data: retryData, error: retryError } = await supabase
+        .from('challenges')
+        .insert([ retryPayload ])
+        .select()
+        .single()
+
+      challenge = retryData
+      challengeInsertError = retryError
+    }
+
+    if (challengeInsertError) {
+      console.error('Error creating challenge:', challengeInsertError)
       return NextResponse.json({ error: 'Failed to create challenge' }, { status: 500 })
     }
 

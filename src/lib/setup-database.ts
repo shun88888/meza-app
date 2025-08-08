@@ -5,6 +5,10 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function setupDatabase() {
   if (!supabaseServiceKey) {
+    // 開発環境では静かにスキップ（正常な動作）
+    if (process.env.NODE_ENV !== 'production') {
+      return false
+    }
     console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY not found, skipping database setup')
     return false
   }

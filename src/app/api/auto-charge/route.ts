@@ -118,3 +118,88 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export async function GET(request: NextRequest) {
+  try {
+    // Check if Stripe is configured
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment service is not configured' },
+        { status: 503 }
+      )
+    }
+
+    const supabase = createServerSideClient()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Optionally validate user_id param if provided
+    const { searchParams } = new URL(request.url)
+    const userIdParam = searchParams.get('user_id')
+    if (userIdParam && userIdParam !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Fetch profile to get stripe customer id
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return NextResponse.json({
+        canAutoCharge: false,
+        reason: 'Profile not found'
+      })
+    }
+
+    if (!profile.stripe_customer_id) {
+      return NextResponse.json({
+        canAutoCharge: false,
+        reason: 'No Stripe customer'
+      })
+    }
+
+    // List payment methods from Stripe
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: profile.stripe_customer_id,
+      type: 'card'
+    })
+
+    if (!paymentMethods.data.length) {
+      return NextResponse.json({
+        canAutoCharge: false,
+        reason: 'No saved payment method'
+      })
+    }
+
+    // Try to detect default payment method
+    const customer = await stripe.customers.retrieve(profile.stripe_customer_id)
+    const defaultPaymentMethodId = typeof customer !== 'string' && !('deleted' in customer)
+      ? (customer.invoice_settings?.default_payment_method as string | null)
+      : null
+
+    const chosen = paymentMethods.data.find(pm => pm.id === defaultPaymentMethodId) || paymentMethods.data[0]
+
+    return NextResponse.json({
+      canAutoCharge: true,
+      paymentMethod: {
+        id: chosen.id,
+        type: chosen.type,
+        card: chosen.card ? {
+          brand: chosen.card.brand,
+          last4: chosen.card.last4,
+          exp_month: chosen.card.exp_month,
+          exp_year: chosen.card.exp_year
+        } : null
+      }
+    })
+  } catch (error) {
+    console.error('Auto-charge check error:', error)
+    return NextResponse.json({ error: 'Failed to check auto charge' }, { status: 500 })
+  }
+}

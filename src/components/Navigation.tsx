@@ -32,7 +32,9 @@ export default function Navigation({ children }: NavigationProps) {
         
         // If user is not authenticated and on a protected route, redirect to signin
         if (!currentUser && !isPublicRoute(pathname)) {
-          router.push(`/auth/signin?redirectTo=${encodeURIComponent(pathname)}`)
+          setTimeout(() => {
+            router.push(`/auth/signin?redirectTo=${encodeURIComponent(pathname)}`)
+          }, 0)
           return
         }
       } catch (error) {
@@ -66,7 +68,9 @@ export default function Navigation({ children }: NavigationProps) {
     try {
       await signOut()
       setUser(null)
-      router.push('/auth/signin')
+      setTimeout(() => {
+        router.push('/auth/signin')
+      }, 0)
     } catch (error) {
       console.error('Sign out error:', error)
     }
@@ -82,24 +86,24 @@ export default function Navigation({ children }: NavigationProps) {
 
   // Bottom navigation items
   const bottomNavItems = [
-    { href: '/', label: 'ホーム', icon: '🏠' },
-    { href: '/stats', label: '統計', icon: '🔐' },
-    { href: '/history', label: '履歴', icon: '📅' },
-    { href: '/settings', label: '設定', icon: '⚙️' },
+    { href: '/', label: 'Home', icon: '🏠' },
+    { href: '/history', label: 'History', icon: '📅' },
+    { href: '/settings', label: 'Settings', icon: '⚙️' },
   ]
 
   // Modern mobile menu items
   const mobileMenuItems: InteractiveMenuItem[] = [
-    { label: 'ホーム', icon: Home },
-    { label: '統計', icon: BarChart3 },
-    { label: '履歴', icon: History },
-    { label: '設定', icon: Settings },
+    { label: 'Home', icon: Home },
+    { label: 'History', icon: History },
+    { label: 'Settings', icon: Settings },
   ]
+
+  // Check if current route is analytics
+  const isAnalyticsActive = pathname === '/analytics'
 
   // Navigation routes for menu items
   const navigationRoutes = [
     '/',
-    '/stats',
     '/history',
     '/settings',
   ]

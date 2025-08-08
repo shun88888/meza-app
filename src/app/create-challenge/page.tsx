@@ -8,7 +8,7 @@ import CountdownScreen from '@/components/CountdownScreen'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { getFormattedAddressFromCoords, formatAddress } from '@/lib/addressFormatter'
 import { getPaymentMethods, PaymentMethodInfo } from '@/lib/stripe'
-import { getCurrentUser } from '@/lib/supabase'
+import { createClientSideClient, getCurrentUser } from '@/lib/supabase'
 
 // Dynamic import to avoid SSR issues - use direct import path
 const MapPicker = dynamic(() => import('../../components/MapPicker'), {
@@ -368,44 +368,108 @@ export default function CreateChallengePage() {
       return
     }
 
-    // Save start location for later use
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const startLocation = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
+    try {
+      console.log('🚀 Starting challenge creation process...')
+      
+      // Get current user
+      const user = await getCurrentUser()
+      if (!user) {
+        alert('ログインが必要です')
+        return
+      }
+
+      // Get current location
+      const getLocation = (): Promise<{ lat: number; lng: number }> => {
+        return new Promise((resolve, reject) => {
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                resolve({
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude
+                })
+              },
+              (error) => {
+                console.error('Error getting location:', error)
+                // Use mock location if GPS fails
+                resolve({ lat: 35.6762, lng: 139.6503 })
+              }
+            )
+          } else {
+            // Use mock location if geolocation not supported
+            resolve({ lat: 35.6762, lng: 139.6503 })
           }
-          
-          // Store challenge data with start location
-          localStorage.setItem('activeChallenge', JSON.stringify({
-            ...challengeData,
-            startLocation,
-            startTime: new Date().toISOString()
-          }))
-          
-          // Show countdown
-          setShowCountdown(true)
-        },
-        (error) => {
-          console.error('Error getting start location:', error)
-          // Use mock location if GPS fails
-          localStorage.setItem('activeChallenge', JSON.stringify({
-            ...challengeData,
-            startLocation: { lat: 35.6762, lng: 139.6503 },
-            startTime: new Date().toISOString()
-          }))
-          setShowCountdown(true)
-        }
-      )
-    } else {
-      // Use mock location if geolocation not supported
-      localStorage.setItem('activeChallenge', JSON.stringify({
-        ...challengeData,
-        startLocation: { lat: 35.6762, lng: 139.6503 },
-        startTime: new Date().toISOString()
-      }))
+        })
+      }
+
+      const startLocation = await getLocation()
+      console.log('📍 Start location:', startLocation)
+
+      // Create challenge in database
+      const supabase = createClientSideClient()
+      if (!supabase) {
+        throw new Error('Failed to create Supabase client')
+      }
+
+      // For compatibility with environments where `target_time` is TIME type, store HH:MM:SS
+      const targetTimeDate = new Date(challengeData.wakeTime)
+      const targetTimeHHMMSS = [
+        String(targetTimeDate.getHours()).padStart(2, '0'),
+        String(targetTimeDate.getMinutes()).padStart(2, '0'),
+        String(targetTimeDate.getSeconds()).padStart(2, '0')
+      ].join(':')
+
+      const challengeRecord = {
+        user_id: user.id,
+        // Use time-only string to satisfy TIME columns; local storage retains ISO for app logic
+        target_time: targetTimeHHMMSS,
+        penalty_amount: challengeData.penaltyAmount,
+        home_address: '現在位置',
+        home_latitude: startLocation.lat,
+        home_longitude: startLocation.lng,
+        target_latitude: challengeData.wakeUpLocation?.lat || startLocation.lat,
+        target_longitude: challengeData.wakeUpLocation?.lng || startLocation.lng,
+        target_address: challengeData.wakeUpLocation?.address || '現在位置',
+        status: 'active',
+        started_at: new Date().toISOString()
+      }
+
+      console.log('💾 Creating challenge record:', challengeRecord)
+
+      const { data: createdChallenge, error: createError } = await supabase
+        .from('challenges')
+        .insert(challengeRecord)
+        .select('id')
+        .single()
+
+      if (createError || !createdChallenge) {
+        console.error('❌ Failed to create challenge:', createError)
+        throw new Error('チャレンジの作成に失敗しました: ' + (createError?.message || 'Unknown error'))
+      }
+
+      console.log('✅ Challenge created successfully:', createdChallenge)
+
+      // Store challenge data with ID in localStorage
+      const challengeDataWithId = {
+        id: createdChallenge.id, // Include the database ID
+        wakeTime: challengeData.wakeTime,
+        penaltyAmount: challengeData.penaltyAmount,
+        startLocation,
+        startTime: new Date().toISOString(),
+        wakeUpLocation: challengeData.wakeUpLocation,
+        paymentMethod: challengeData.paymentMethod,
+        selectedPaymentMethodId: challengeData.selectedPaymentMethodId
+      }
+
+      localStorage.setItem('activeChallenge', JSON.stringify(challengeDataWithId))
+      console.log('💾 Stored challenge data with ID:', challengeDataWithId)
+      
+      // Show countdown
       setShowCountdown(true)
+      
+    } catch (error) {
+      console.error('❌ Error in challenge creation:', error)
+      alert(error instanceof Error ? error.message : 'チャレンジの作成中にエラーが発生しました')
     }
   }
 
@@ -487,13 +551,10 @@ export default function CreateChallengePage() {
             }
           >
             <MapPicker
-              location={challengeData.wakeUpLocation}
-              onLocationSelect={handleLocationSelect}
+              locations={{ wakeUp: challengeData.wakeUpLocation }}
+              onLocationSelect={(locationType, location) => handleLocationSelect(location)}
               height="100vh"
               className="w-full"
-              wakeUpLocation={challengeData.wakeUpLocation}
-              showPins={true}
-              readOnly={false}
             />
           </ErrorBoundary>
         </div>

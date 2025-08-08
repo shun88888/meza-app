@@ -52,7 +52,7 @@ const nextConfig = {
   // PWA configuration
   experimental: {
     // Disable app directory features that might cause hydration issues
-    serverComponentsExternalPackages: ['leaflet'],
+    serverComponentsExternalPackages: [],
   },
   
   // Improve build performance

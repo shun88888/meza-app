@@ -173,10 +173,12 @@ export default function ChallengePage() {
           }
         >
           <MapPicker
-            location={{
-              lat: challenge.target_latitude,
-              lng: challenge.target_longitude,
-              address: challenge.target_address
+            locations={{
+              wakeUp: {
+                lat: challenge.target_latitude,
+                lng: challenge.target_longitude,
+                address: challenge.target_address
+              }
             }}
             onLocationSelect={() => {}} // Read-only for this view
             height="612px"

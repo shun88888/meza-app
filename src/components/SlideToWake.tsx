@@ -62,7 +62,8 @@ const SlideToWake = forwardRef<SlideToWakeRef, SlideToWakeProps>(({
   const handleTouchStart = (e: React.TouchEvent) => {
     if (disabled) return
     setIsDragging(true)
-    e.preventDefault()
+    // Remove preventDefault to avoid passive event listener warning
+    // e.preventDefault()
   }
 
   useEffect(() => {

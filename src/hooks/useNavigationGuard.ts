@@ -44,7 +44,9 @@ export function useNavigationGuard(options: UseNavigationGuardOptions = {}) {
         }
 
         if (redirectTo) {
-          router.push(redirectTo)
+          setTimeout(() => {
+            router.push(redirectTo)
+          }, 0)
         }
 
         return false
@@ -67,12 +69,16 @@ export function useNavigationGuard(options: UseNavigationGuardOptions = {}) {
         }
 
         if (redirectTo) {
-          router.push(redirectTo)
+          setTimeout(() => {
+            router.push(redirectTo)
+          }, 0)
         }
         return false
       }
 
-      router.push(url)
+      setTimeout(() => {
+        router.push(url)
+      }, 0)
       return true
     } catch (error) {
       console.error('Guarded navigation error:', error)
@@ -95,11 +101,14 @@ export function useNavigationGuard(options: UseNavigationGuardOptions = {}) {
           alert(message)
         }
 
-        if (redirectTo) {
-          router.replace(redirectTo)
-        } else {
-          router.replace('/')
-        }
+        // Use setTimeout to avoid React state updates during event handling
+        setTimeout(() => {
+          if (redirectTo) {
+            router.replace(redirectTo)
+          } else {
+            router.replace('/')
+          }
+        }, 0)
       }
     } catch (error) {
       console.error('PopState navigation guard error:', error)
@@ -153,18 +162,24 @@ export function useNavigationGuard(options: UseNavigationGuardOptions = {}) {
             alert(message)
           }
 
-          if (redirectTo) {
-            router.replace(redirectTo)
-          } else {
-            router.replace('/')
-          }
+          // Use setTimeout to avoid React state updates during render
+          setTimeout(() => {
+            if (redirectTo) {
+              router.replace(redirectTo)
+            } else {
+              router.replace('/')
+            }
+          }, 0)
         }
       } catch (error) {
         console.error('Route validation error:', error)
       }
     }
 
-    validateCurrentRoute()
+    // Also use setTimeout to defer initial validation
+    setTimeout(() => {
+      validateCurrentRoute()
+    }, 0)
   }, [pathname, enableRouteGuarding, showBlockedMessage, router])
 
   return {

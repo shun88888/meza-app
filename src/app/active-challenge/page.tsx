@@ -81,8 +81,15 @@ export default function ActiveChallengePage() {
         if (localChallenge) {
           try {
             const parsedChallenge = JSON.parse(localChallenge)
-            setChallengeData(parsedChallenge)
-            return
+            
+            // Check if the localStorage data has an ID field
+            if (parsedChallenge.id || parsedChallenge.challengeId || parsedChallenge.challenge_id) {
+              setChallengeData(parsedChallenge)
+              return
+            } else {
+              console.warn('⚠️ LocalStorage challenge data missing ID, will fetch from database')
+              localStorage.removeItem('activeChallenge') // Remove incomplete data
+            }
           } catch (parseError) {
             console.error('Error parsing local challenge:', parseError)
             localStorage.removeItem('activeChallenge')
@@ -183,17 +190,33 @@ export default function ActiveChallengePage() {
     console.log('🔥 handleAutoCharge called!')
     console.log('Challenge data:', challengeData)
     
-    if (!challengeData || !challengeData.id) {
+    // Debug: Check all possible ID fields
+    console.log('=== CHALLENGE ID DEBUG ===')
+    console.log('challengeData.id:', challengeData?.id)
+    console.log('challengeData.challengeId:', (challengeData as any)?.challengeId)
+    console.log('All keys:', challengeData ? Object.keys(challengeData) : 'No challengeData')
+    
+    const challengeId = challengeData?.id || (challengeData as any)?.challengeId || (challengeData as any)?.challenge_id
+    
+    if (!challengeData || !challengeId) {
       console.error('❌ Challenge data or ID is missing:', challengeData)
+      console.error('❌ No valid challenge ID found. Available fields:', challengeData ? Object.keys(challengeData) : 'none')
+      
+      // Try to get from localStorage with different key
+      const localChallenge = localStorage.getItem('activeChallenge')
+      if (localChallenge) {
+        console.log('❌ LocalStorage challenge data:', localChallenge)
+      }
+      
       return
     }
     
-    console.log('✅ Starting auto-charge process for challenge:', challengeData.id)
+    console.log('✅ Starting auto-charge process for challenge:', challengeId)
     setIsTracking(true)
     
     try {
       // First complete the challenge as failed
-      const completeResponse = await fetch(`/api/challenges/${challengeData.id}/complete`, {
+      const completeResponse = await fetch(`/api/challenges/${challengeId}/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +242,7 @@ export default function ActiveChallengePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          challengeId: challengeData.id,
+          challengeId: challengeId,
           amount: challengeData.penaltyAmount
         })
       })
@@ -248,7 +271,7 @@ export default function ActiveChallengePage() {
         reason: '起床時間を過ぎました（決済処理が必要です）',
         timestamp: new Date().toISOString(),
         needsManualPayment: true,
-        challengeId: challengeData.id
+        challengeId: challengeId
       }))
       
       localStorage.removeItem('activeChallenge')
@@ -299,7 +322,7 @@ export default function ActiveChallengePage() {
       if (distance >= 100) {
         // Success: Complete the challenge
         try {
-          const completeResponse = await fetch(`/api/challenges/${challengeData.id}/complete`, {
+          const completeResponse = await fetch(`/api/challenges/${challengeId}/complete`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -331,7 +354,7 @@ export default function ActiveChallengePage() {
         if (currentTime > wakeTime) {
           // Challenge failed - complete as failed
           try {
-            const completeResponse = await fetch(`/api/challenges/${challengeData.id}/complete`, {
+            const completeResponse = await fetch(`/api/challenges/${challengeId}/complete`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -440,7 +463,8 @@ export default function ActiveChallengePage() {
       }))
       
       // Fast time check for auto-charge
-      if (challengeData && challengeData.wakeTime && challengeData.id && !hasAutoCharged && !isTracking) {
+      const challengeId = challengeData?.id || (challengeData as any)?.challengeId || (challengeData as any)?.challenge_id
+      if (challengeData && challengeData.wakeTime && challengeId && !hasAutoCharged && !isTracking) {
         try {
           const wakeTime = new Date(challengeData.wakeTime)
           

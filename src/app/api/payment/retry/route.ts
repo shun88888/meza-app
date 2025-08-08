@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { paymentIntentId, paymentMethodId } = await request.json()
+    const { paymentIntentId, paymentMethodId, isAutoRetry = false } = await request.json()
 
     if (!paymentIntentId) {
       return NextResponse.json({ error: 'Payment intent ID is required' }, { status: 400 })
@@ -80,14 +80,38 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Update payment record status
+    // Update payment record with retry information
+    const { data: paymentRecord, error: paymentFetchError } = await supabase
+      .from('payments')
+      .select('retry_count, challenge_id')
+      .eq('stripe_payment_intent_id', paymentIntentId)
+      .single()
+
+    if (paymentFetchError) {
+      console.error('Failed to fetch payment record:', paymentFetchError)
+    }
+
+    const newRetryCount = (paymentRecord?.retry_count || 0) + 1
+
     await supabase
       .from('payments')
       .update({ 
-        status: 'pending',
-        updated_at: new Date().toISOString()
+        status: updatedPaymentIntent.status === 'succeeded' ? 'completed' : 'pending',
+        retry_count: newRetryCount,
+        updated_at: new Date().toISOString(),
+        last_retry_at: new Date().toISOString()
       })
       .eq('stripe_payment_intent_id', paymentIntentId)
+
+    // Send notification about retry attempt
+    if (isAutoRetry) {
+      await supabase.rpc('send_notification', {
+        user_id_param: user.id,
+        title_param: '決済リトライ実行',
+        body_param: `決済の再試行を実行しました（${newRetryCount}回目）`,
+        type_param: 'payment_retry'
+      }).catch(err => console.error('Failed to send retry notification:', err))
+    }
 
     return NextResponse.json({
       paymentIntent: {

@@ -206,12 +206,62 @@ export async function POST(request: NextRequest) {
     // Get the payment method details
     const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
 
+    // Sync to local payment_methods for Edge Functions/off_session charges
+    if ('card' in paymentMethod && paymentMethod.card) {
+      // Mark others as non-default
+      await supabase
+        .from('payment_methods')
+        .update({ is_default: false, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+
+      // Upsert-like: try update then insert
+      const { data: existing, error: fetchPmError } = await supabase
+        .from('payment_methods')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('stripe_payment_method_id', paymentMethod.id)
+        .maybeSingle()
+
+      if (!fetchPmError && existing) {
+        await supabase
+          .from('payment_methods')
+          .update({
+            last4: paymentMethod.card.last4 || '',
+            brand: paymentMethod.card.brand || 'card',
+            exp_month: paymentMethod.card.exp_month || 0,
+            exp_year: paymentMethod.card.exp_year || 0,
+            cardholder_name: userProfile.email || 'N/A',
+            is_default: true,
+            stripe_customer_id: customerId,
+            stripe_payment_method_id: paymentMethod.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id)
+      } else {
+        await supabase
+          .from('payment_methods')
+          .insert({
+            user_id: userId,
+            last4: paymentMethod.card.last4 || '',
+            brand: paymentMethod.card.brand || 'card',
+            exp_month: paymentMethod.card.exp_month || 0,
+            exp_year: paymentMethod.card.exp_year || 0,
+            cardholder_name: userProfile.email || 'N/A',
+            is_default: true,
+            stripe_customer_id: customerId,
+            stripe_payment_method_id: paymentMethod.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+      }
+    }
+
     return NextResponse.json({
       success: true,
       paymentMethod: {
         id: paymentMethod.id,
         type: paymentMethod.type,
-        card: paymentMethod.card,
+        card: (paymentMethod as any).card,
       },
       customerId: customerId
     })

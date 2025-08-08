@@ -20,9 +20,114 @@ function convertKanjiToNumber(text: string): string {
   return result
 }
 
+// 改善された住所解析関数
+function smartFormatAddress(addressData: any): string {
+  console.log('=== smartFormatAddress 開始 ===')
+  console.log('入力データ:', addressData)
+  
+  const parts: string[] = []
+  
+  // 1. 都道府県（必須）
+  if (addressData.state) {
+    parts.push(addressData.state)
+    console.log('都道府県:', addressData.state)
+  }
+  
+  // 2. 市区町村の優先順位付き選択
+  const cityOptions = [
+    addressData.city,
+    addressData.town,
+    addressData.village,
+    addressData.municipality
+  ].filter(Boolean)
+  
+  if (cityOptions.length > 0) {
+    // 「市」「町」「村」で終わるものを優先
+    const properCity = cityOptions.find(city => /(市|町|村)$/.test(city)) || cityOptions[0]
+    parts.push(properCity)
+    console.log('市区町村:', properCity)
+  }
+  
+  // 3. 区・地区の優先順位付き選択
+  const districtOptions = [
+    addressData.city_district,
+    addressData.suburb,
+    addressData.borough
+  ].filter(Boolean)
+  
+  if (districtOptions.length > 0) {
+    // 「区」で終わるものを優先
+    const properDistrict = districtOptions.find(district => /区$/.test(district)) || districtOptions[0]
+    parts.push(properDistrict)
+    console.log('区:', properDistrict)
+  }
+  
+  // 4. 町丁目・地域の優先順位付き選択
+  const localityOptions = [
+    addressData.neighbourhood,
+    addressData.hamlet,
+    addressData.quarter,
+    addressData.residential,
+    addressData.road
+  ].filter(Boolean)
+  
+  if (localityOptions.length > 0) {
+    // 番地や数字のみの部分を除外
+    const validLocality = localityOptions.find(locality => 
+      locality.length > 1 && 
+      !/^[0-9-]+$/.test(locality) &&
+      !/^[0-9]+番地?$/.test(locality)
+    )
+    
+    if (validLocality) {
+      // 漢数字を数字に変換
+      const convertedLocality = convertKanjiToNumber(validLocality)
+      parts.push(convertedLocality)
+      console.log('町丁目:', convertedLocality)
+    }
+  }
+  
+  console.log('全パーツ:', parts)
+  
+  // 住所の構築
+  let result = ''
+  
+  if (parts.length >= 4) {
+    // 都道府県+市+区+町丁目
+    const prefectureCity = parts.slice(0, 2).join('')
+    const districtLocality = parts.slice(2).join('')
+    result = `${prefectureCity}　${districtLocality}`
+  } else if (parts.length >= 3) {
+    // 都道府県+市+区 or 都道府県+市+町丁目
+    const prefectureCity = parts.slice(0, 2).join('')
+    const remaining = parts.slice(2).join('')
+    result = `${prefectureCity}　${remaining}`
+  } else if (parts.length >= 2) {
+    // 都道府県+市
+    result = parts.join('')
+  } else if (parts.length === 1) {
+    // 都道府県のみ
+    result = parts[0]
+  }
+  
+  console.log('構築された住所:', result)
+  console.log('=== smartFormatAddress 終了 ===')
+  
+  return result
+}
+
 // シンプルな住所フォーマット関数
 export function formatAddress(displayName: string | null): string {
   if (!displayName) {
+    return ''
+  }
+
+  // 不適切な入力をチェック
+  if (displayName.includes('取得中') || 
+      displayName.includes('失敗') || 
+      displayName.includes('タイムアウト') ||
+      displayName.includes('エラー')) {
+    console.log('formatAddress: 不適切な入力をスキップ:', displayName)
     return ''
   }
 
@@ -126,10 +231,19 @@ export async function getFormattedAddressFromCoords(lat: number, lng: number): P
   
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 3000) // 3秒に短縮
+    const timeoutId = setTimeout(() => controller.abort(), 8000) // 8秒に延長
+    
+    const params = new URLSearchParams({
+      'format': 'json',
+      'lat': lat.toString(),
+      'lon': lng.toString(),
+      'accept-language': 'ja,en',
+      'zoom': '18', // 18レベル
+      'addressdetails': '1',
+    })
     
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ja&zoom=18&addressdetails=1`,
+      `https://nominatim.openstreetmap.org/reverse?${params.toString()}`,
       { signal: controller.signal }
     )
     
@@ -138,90 +252,28 @@ export async function getFormattedAddressFromCoords(lat: number, lng: number): P
     if (response.ok) {
       const data = await response.json()
       
-      // === デバッグログ強化 ===
-      console.log('=== Nominatim API Debug Info ===')
+      console.log('=== 住所取得結果 ===')
       console.log('座標:', lat, lng)
       console.log('display_name:', data.display_name)
       console.log('address object:', data.address)
       
-      if (data.address) {
-        console.log('address details:')
-        console.log('  state:', data.address.state)
-        console.log('  city:', data.address.city)
-        console.log('  town:', data.address.town)
-        console.log('  suburb:', data.address.suburb)
-        console.log('  city_district:', data.address.city_district)
-        console.log('  neighbourhood:', data.address.neighbourhood)
-        console.log('  hamlet:', data.address.hamlet)
-        console.log('  quarter:', data.address.quarter)
-        console.log('  road:', data.address.road)
-        console.log('  house_number:', data.address.house_number)
-        console.log('  postcode:', data.address.postcode)
-        console.log('  country:', data.address.country)
-      }
-      console.log('=== End Debug Info ===')
-      
-      // シンプルな住所構築テスト
-      console.log('=== シンプルテスト ===')
-      const simpleAddress = data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`
-      console.log('シンプル住所:', simpleAddress)
-      
-      // 現在の複雑な処理も実行（比較用）
       let formattedAddress = ''
       
+      // スマートフォーマットを試す
       if (data.address) {
-        const addr = data.address
-        const parts: string[] = []
-        
-        // 都道府県
-        if (addr.state) parts.push(addr.state)
-        
-        // 市
-        if (addr.city) {
-          parts.push(addr.city)
-        } else if (addr.town) {
-          parts.push(addr.town)
-        }
-        
-        // 区
-        if (addr.suburb) {
-          parts.push(addr.suburb)
-        } else if (addr.city_district) {
-          parts.push(addr.city_district)
-        }
-        
-        // 町丁目
-        if (addr.neighbourhood) {
-          parts.push(convertKanjiToNumber(addr.neighbourhood))
-        } else if (addr.hamlet) {
-          parts.push(convertKanjiToNumber(addr.hamlet))
-        } else if (addr.quarter) {
-          parts.push(convertKanjiToNumber(addr.quarter))
-        }
-        
-        console.log('抽出されたパーツ:', parts)
-        
-        // フォーマット
-        if (parts.length >= 3) {
-          const prefectureCity = parts.slice(0, 2).join('')
-          const wardTown = parts.slice(2).join('')
-          formattedAddress = `${prefectureCity}　${wardTown}`
-        } else if (parts.length >= 2) {
-          formattedAddress = parts.join('')
-        }
+        formattedAddress = smartFormatAddress(data.address)
+        console.log('スマートフォーマット結果:', formattedAddress)
       }
       
-      console.log('複雑な整形結果:', formattedAddress)
-      
-      // address detailsからの構築に失敗した場合、従来の方法を使用
-      if (!formattedAddress) {
+      // スマートフォーマットが失敗した場合はdisplay_nameを直接フォーマット
+      if (!formattedAddress && data.display_name) {
         formattedAddress = formatAddress(data.display_name)
-        console.log('formatAddress関数の結果:', formattedAddress)
+        console.log('display_nameフォーマット結果:', formattedAddress)
       }
       
-      const finalAddress = formattedAddress || simpleAddress
-      console.log('最終的な住所:', finalAddress)
-      console.log('=== End シンプルテスト ===')
+      // 最終的にはdisplay_nameをそのまま使用
+      const finalAddress = formattedAddress || data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      console.log('最終住所:', finalAddress)
       
       // キャッシュに保存
       addressCache.set(cacheKey, { address: finalAddress, timestamp: Date.now() })
@@ -229,14 +281,11 @@ export async function getFormattedAddressFromCoords(lat: number, lng: number): P
       return finalAddress
     } else {
       console.error('Nominatim API error:', response.status, response.statusText)
-      const fallbackAddress = `住所取得失敗 (${lat.toFixed(4)}, ${lng.toFixed(4)})`
-      addressCache.set(cacheKey, { address: fallbackAddress, timestamp: Date.now() })
-      return fallbackAddress
+      throw new Error(`API Error: ${response.status}`)
     }
   } catch (error) {
     console.error('住所取得エラー:', error)
     
-    // エラーの種類に応じた適切なメッセージ
     let errorMessage = '住所取得失敗'
     if (error instanceof Error) {
       if (error.name === 'AbortError') {

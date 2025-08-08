@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClientSideClient } from '@/lib/supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export default function SignupPage() {
   const router = useRouter()
-  const supabase = createClientSideClient()
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -17,10 +17,14 @@ export default function SignupPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null)
 
   // Prevent hydration mismatch
   useEffect(() => {
     setIsClient(true)
+    // Initialize Supabase client after component mounts
+    const client = createClientSideClient()
+    setSupabaseClient(client)
   }, [])
 
   // Set yellow theme color for signup page
@@ -37,22 +41,6 @@ export default function SignupPage() {
       document.head.appendChild(meta)
     }
   }, [isClient])
-
-  // Early return after hooks if supabase is not available
-  if (!supabase) {
-    return (
-      <div className="min-h-screen bg-yellow-400 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-black mb-4">
-            サービスが利用できません
-          </h1>
-          <p className="text-gray-800">
-            しばらく時間をおいてから再度お試しください。
-          </p>
-        </div>
-      </div>
-    )
-  }
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -98,7 +86,11 @@ export default function SignupPage() {
     setIsLoading(true)
     
     try {
-      const { error } = await supabase.auth.signUp({
+      if (!supabaseClient) {
+        throw new Error('Supabase client not initialized')
+      }
+      
+      const { error } = await supabaseClient.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -133,6 +125,19 @@ export default function SignupPage() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
     }
+  }
+
+  // Show loading state while client is not ready
+  if (!isClient || !supabaseClient) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-black mb-4">
+            読み込み中...
+          </h1>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -227,9 +232,10 @@ export default function SignupPage() {
 
             {/* Date of Birth field */}
             <div>
-              <label className="block text-xs font-semibold text-black mb-2 uppercase tracking-wider">DATE OF BIRTH</label>
+              <label htmlFor="dateOfBirth" className="block text-xs font-semibold text-black mb-2 uppercase tracking-wider">DATE OF BIRTH</label>
               <div className="relative">
                 <select
+                  id="dateOfBirth"
                   value={formData.dateOfBirth}
                   onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
                   className={`w-full px-5 py-4 bg-gray-200 rounded-xl border-0 text-black appearance-none focus:outline-none focus:bg-gray-300 transition-all duration-200 ${

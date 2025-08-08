@@ -25,10 +25,20 @@ export const ALLOWED_ROUTES: NavigationRule[] = [
   { pattern: '/privacy', type: 'allow', description: 'プライバシーポリシー' },
   { pattern: '/terms', type: 'allow', description: '利用規約' },
   { pattern: '/about', type: 'allow', description: 'アバウトページ' },
+  { pattern: '/login', type: 'allow', description: 'ログインページ' },
+  { pattern: '/signup', type: 'allow', description: 'サインアップページ' },
+  
+  // Error and system pages (always allowed)
+  { pattern: '/not-found', type: 'allow', description: '404エラーページ' },
+  { pattern: '/error', type: 'allow', description: 'エラーページ' },
+  { pattern: '/blocked', type: 'allow', description: 'ブロックページ' },
+  { pattern: '/unauthorized', type: 'allow', description: '認証エラーページ' },
+  { pattern: '/external-link-blocked', type: 'allow', description: '外部リンクブロックページ' },
   
   // Protected routes (require authentication)
   { pattern: '/', type: 'allow', description: 'ホームページ', requiresAuth: true },
   { pattern: '/stats', type: 'allow', description: '統計ページ', requiresAuth: true },
+  { pattern: '/analytics', type: 'allow', description: 'アナリティクスページ', requiresAuth: true },
   { pattern: '/history', type: 'allow', description: '履歴ページ', requiresAuth: true },
   { pattern: '/settings', type: 'allow', description: '設定ページ', requiresAuth: true },
   { pattern: '/create-challenge', type: 'allow', description: 'チャレンジ作成', requiresAuth: true },

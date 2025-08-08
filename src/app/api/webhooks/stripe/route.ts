@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createServerSideClient } from '@/lib/supabase-server'
 import { Database } from '@/types/database'
 
 let stripe: Stripe | null = null
@@ -55,62 +54,121 @@ export async function POST(request: NextRequest) {
   }
 
   // Supabase client (using service role for webhook operations)
-  const supabase = createServerComponentClient<Database>({ cookies })
+  const supabase = createServerSideClient()
 
   try {
+    // Log webhook event for monitoring
+    await supabase.from('webhook_logs').insert({
+      event_id: event.id,
+      event_type: event.type,
+      processed_at: new Date().toISOString(),
+      status: 'processing'
+    }).catch(err => console.error('Failed to log webhook event:', err))
+
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent
-        console.log('Payment succeeded:', paymentIntent.id)
+        console.log('💰 Payment succeeded:', paymentIntent.id)
 
-        const challengeId = paymentIntent.metadata.challengeId
-        const userId = paymentIntent.metadata.userId
+        const challengeId = paymentIntent.metadata.challenge_id || paymentIntent.metadata.challengeId
+        const userId = paymentIntent.metadata.user_id || paymentIntent.metadata.userId
+        const paymentType = paymentIntent.metadata.type || 'manual'
 
         if (!challengeId || !userId) {
-          console.error('Missing challengeId or userId in payment intent metadata')
+          console.error('❌ Missing challengeId or userId in payment intent metadata')
+          await supabase.from('webhook_logs').insert({
+            event_id: event.id,
+            event_type: event.type,
+            processed_at: new Date().toISOString(),
+            status: 'failed',
+            error_message: 'Missing required metadata'
+          })
           break
         }
 
-        // Update payment status
+        // Update payment status with detailed information
         const { error: paymentUpdateError } = await supabase
           .from('payments')
-          .update({ status: 'succeeded' })
+          .update({ 
+            status: 'completed',
+            stripe_payment_intent_id: paymentIntent.id,
+            receipt_url: paymentIntent.charges.data[0]?.receipt_url,
+            updated_at: new Date().toISOString()
+          })
           .eq('stripe_payment_intent_id', paymentIntent.id)
 
         if (paymentUpdateError) {
-          console.error('Failed to update payment status:', paymentUpdateError)
+          console.error('❌ Failed to update payment status:', paymentUpdateError)
+        } else {
+          console.log('✅ Payment status updated successfully')
         }
 
-        // Update challenge status to failed (penalty paid)
+        // Update challenge status 
         const { error: challengeUpdateError } = await supabase
           .from('challenges')
           .update({ 
             status: 'failed',
-            completed_at: new Date().toISOString()
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           })
           .eq('id', challengeId)
 
         if (challengeUpdateError) {
-          console.error('Failed to update challenge status:', challengeUpdateError)
+          console.error('❌ Failed to update challenge status:', challengeUpdateError)
         } else {
-          console.log(`Challenge ${challengeId} marked as failed due to penalty payment`)
+          console.log(`✅ Challenge ${challengeId} marked as failed (penalty paid)`)
         }
+
+        // Send success notification
+        await supabase.rpc('send_notification', {
+          user_id_param: userId,
+          title_param: '決済完了',
+          body_param: `ペナルティ料金 ¥${(paymentIntent.amount / 100).toLocaleString()} の決済が完了しました。`,
+          type_param: 'payment_success'
+        }).catch(err => console.error('Failed to send notification:', err))
+
+        // Log successful processing
+        await supabase.from('webhook_logs').update({
+          status: 'completed',
+          processed_at: new Date().toISOString()
+        }).eq('event_id', event.id)
 
         break
       }
 
       case 'payment_intent.payment_failed': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent
-        console.log('Payment failed:', paymentIntent.id)
+        console.log('❌ Payment failed:', paymentIntent.id)
 
-        // Update payment status
+        const challengeId = paymentIntent.metadata.challenge_id || paymentIntent.metadata.challengeId
+        const userId = paymentIntent.metadata.user_id || paymentIntent.metadata.userId
+        const lastError = paymentIntent.last_payment_error
+
+        // Update payment status with failure details
         const { error: paymentUpdateError } = await supabase
           .from('payments')
-          .update({ status: 'failed' })
+          .update({ 
+            status: 'failed',
+            failure_code: lastError?.code,
+            failure_message: lastError?.message,
+            updated_at: new Date().toISOString()
+          })
           .eq('stripe_payment_intent_id', paymentIntent.id)
 
         if (paymentUpdateError) {
-          console.error('Failed to update payment status:', paymentUpdateError)
+          console.error('❌ Failed to update payment status:', paymentUpdateError)
+        } else {
+          console.log('✅ Payment failure status updated')
+        }
+
+        // Send failure notification with retry option
+        if (userId) {
+          await supabase.rpc('send_notification', {
+            user_id_param: userId,
+            title_param: '決済失敗',
+            body_param: `決済に失敗しました。カード情報を確認してください。エラー: ${lastError?.message || '不明なエラー'}`,
+            type_param: 'payment_error'
+          }).catch(err => console.error('Failed to send notification:', err))
         }
 
         break
