@@ -27,6 +27,8 @@ export const ALLOWED_ROUTES: NavigationRule[] = [
   { pattern: '/about', type: 'allow', description: 'アバウトページ' },
   { pattern: '/login', type: 'allow', description: 'ログインページ' },
   { pattern: '/signup', type: 'allow', description: 'サインアップページ' },
+  // Challenge failed page should always be accessible after flow
+  { pattern: '/challenge-failed', type: 'allow', description: 'チャレンジ失敗ページ' },
   
   // Error and system pages (always allowed)
   { pattern: '/not-found', type: 'allow', description: '404エラーページ' },

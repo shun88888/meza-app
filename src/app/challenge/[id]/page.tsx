@@ -204,7 +204,7 @@ export default function ChallengePage() {
           <div className="flex items-center h-12 border-b border-gray-200">
             <div className="w-16 text-xs text-gray-500 tracking-wide">起床場所</div>
             <div className="flex-1 text-sm text-gray-800">
-              {formatAddress(challenge.home_address)}
+              {formatAddress(challenge.target_address)}
             </div>
           </div>
 

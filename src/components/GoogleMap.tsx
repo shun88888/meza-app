@@ -119,13 +119,11 @@ export default function GoogleMap({
         title: markerData.title || `Marker ${index + 1}`,
         draggable: markerData.draggable || false,
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: '#FF6B35',
-          fillOpacity: 1,
-          strokeColor: '#FFFFFF',
-          strokeWeight: 2,
-        }
+          url: '/marker-target.svg',
+          scaledSize: new google.maps.Size(40, 40),
+          anchor: new google.maps.Point(20, 40),
+        },
+        optimized: true,
       })
 
       // ドラッグイベント

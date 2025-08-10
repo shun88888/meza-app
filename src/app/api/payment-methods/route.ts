@@ -10,7 +10,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
-    
     // ユーザー認証確認
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
@@ -34,50 +33,79 @@ export async function POST(request: NextRequest) {
     // PaymentMethodを取得
     const paymentMethod = await stripe.paymentMethods.retrieve(payment_method_id)
 
-    // Stripe顧客を作成または取得
-    let customerId = null
+    // プロファイルからStripe顧客IDを取得（なければ作成して保存）
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id, email')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError) {
+      console.error('Profile fetch error:', profileError)
+    }
+
+    let customerId = profile?.stripe_customer_id || null
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: profile?.email || user.email || undefined,
+        name: cardholder_name,
+        metadata: { user_id: user.id }
+      })
+      customerId = customer.id
+      await supabase
+        .from('profiles')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', user.id)
+    }
+
+    // PaymentMethodを顧客にアタッチ
+    await stripe.paymentMethods.attach(payment_method_id, { customer: customerId })
+
+    // 既存のデフォルト有無を確認し、なければ今回をデフォルトに設定
+    let setAsDefault = false
     try {
-      // 既存の顧客をチェック
-      const existingCustomers = await stripe.customers.list({
-        email: user.email,
-        limit: 1
-      })
-      
-      if (existingCustomers.data.length > 0) {
-        customerId = existingCustomers.data[0].id
-      } else {
-        // 新しい顧客を作成
-        const customer = await stripe.customers.create({
-          email: user.email || undefined,
-          name: cardholder_name,
-          metadata: {
-            user_id: user.id
-          }
+      const customer = await stripe.customers.retrieve(customerId)
+      const hasDefault = typeof customer !== 'string' && !('deleted' in customer) && !!customer.invoice_settings?.default_payment_method
+      setAsDefault = !hasDefault
+      if (setAsDefault) {
+        await stripe.customers.update(customerId, {
+          invoice_settings: { default_payment_method: payment_method_id }
         })
-        customerId = customer.id
       }
+    } catch (e) {
+      console.warn('Customer default check/update failed (continuing):', (e as any)?.message)
+    }
 
-      // PaymentMethodを顧客にアタッチ
-      await stripe.paymentMethods.attach(payment_method_id, {
-        customer: customerId,
-      })
+    // ローカルDBへ保存（Stripe連携IDも保持）
+    if (!paymentMethod.card) {
+      return NextResponse.json({ error: 'Unsupported payment method' }, { status: 400 })
+    }
 
-      // Supabaseに保存（StripeのPaymentMethod IDと基本情報のみ）
-      const { data, error } = await supabase
+    // まず他のカードのデフォルトを外す（今回デフォルトにした場合）
+    if (setAsDefault) {
+      await supabase
         .from('payment_methods')
-        .insert({
-          id: paymentMethod.id, // StripeのPaymentMethod IDを使用
-          user_id: user.id,
-          last4: paymentMethod.card!.last4,
-          brand: paymentMethod.card!.brand,
-          exp_month: paymentMethod.card!.exp_month,
-          exp_year: paymentMethod.card!.exp_year,
-          cardholder_name: cardholder_name,
-          is_default: false,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single()
+        .update({ is_default: false, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+    }
+
+    const { data, error } = await supabase
+      .from('payment_methods')
+      .insert({
+        user_id: user.id,
+        last4: paymentMethod.card.last4,
+        brand: paymentMethod.card.brand,
+        exp_month: paymentMethod.card.exp_month,
+        exp_year: paymentMethod.card.exp_year,
+        cardholder_name: cardholder_name,
+        is_default: setAsDefault,
+        stripe_customer_id: customerId,
+        stripe_payment_method_id: paymentMethod.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single()
 
       if (error) {
         console.error('Supabase error:', error)
@@ -106,15 +134,6 @@ export async function POST(request: NextRequest) {
           }
         }
       })
-
-    } catch (stripeError: any) {
-      console.error('Stripe error:', stripeError)
-      return NextResponse.json(
-        { error: `カード登録に失敗しました: ${stripeError.message}` }, 
-        { status: 400 }
-      )
-    }
-
   } catch (error) {
     console.error('Payment method creation error:', error)
     return NextResponse.json(

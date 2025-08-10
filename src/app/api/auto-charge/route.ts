@@ -34,27 +34,78 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Challenge not found' }, { status: 404 })
     }
 
-    // Get user's payment methods
+    // Try local DB first
     const { data: paymentMethods, error: paymentError } = await supabase
       .from('payment_methods')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
-    if (paymentError || !paymentMethods || paymentMethods.length === 0) {
-      return NextResponse.json({ error: 'No payment method found' }, { status: 400 })
-    }
+    let selectedCustomerId: string | null = null
+    let selectedPaymentMethodId: string | null = null
 
-    // Use the first (most recent) payment method or find default
-    const defaultPaymentMethod = paymentMethods.find(pm => pm.is_default) || paymentMethods[0]
+    if (!paymentError && paymentMethods && paymentMethods.length > 0) {
+      const defaultPaymentMethod = paymentMethods.find(pm => pm.is_default) || paymentMethods[0]
+      selectedCustomerId = defaultPaymentMethod.stripe_customer_id
+      selectedPaymentMethodId = defaultPaymentMethod.stripe_payment_method_id
+    } else {
+      // Fallback: fetch from Stripe using profile's customer id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('stripe_customer_id')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.stripe_customer_id) {
+        const stripePmList = await stripe.paymentMethods.list({
+          customer: profile.stripe_customer_id,
+          type: 'card',
+        })
+
+        if (stripePmList.data.length > 0) {
+          // determine default
+          const customer = await stripe.customers.retrieve(profile.stripe_customer_id)
+          const defaultPmId = typeof customer !== 'string' && !('deleted' in customer)
+            ? (customer.invoice_settings?.default_payment_method as string | null)
+            : null
+
+          const chosen = stripePmList.data.find(pm => pm.id === defaultPmId) || stripePmList.data[0]
+          selectedCustomerId = profile.stripe_customer_id
+          selectedPaymentMethodId = chosen.id
+
+          // Optionally backfill into local table for next time
+          try {
+            await supabase.from('payment_methods').insert({
+              user_id: user.id,
+              last4: chosen.card?.last4 || null,
+              brand: chosen.card?.brand || null,
+              exp_month: chosen.card?.exp_month || null,
+              exp_year: chosen.card?.exp_year || null,
+              cardholder_name: undefined,
+              is_default: !!defaultPmId && chosen.id === defaultPmId,
+              stripe_customer_id: profile.stripe_customer_id,
+              stripe_payment_method_id: chosen.id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          } catch (_) {
+            // ignore backfill errors
+          }
+        }
+      }
+
+      if (!selectedCustomerId || !selectedPaymentMethodId) {
+        return NextResponse.json({ error: 'No payment method found' }, { status: 400 })
+      }
+    }
 
     try {
       // Create payment intent for auto-charge
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount * 100, // Convert to cents
         currency: 'jpy',
-        customer: defaultPaymentMethod.stripe_customer_id,
-        payment_method: defaultPaymentMethod.stripe_payment_method_id,
+        customer: selectedCustomerId!,
+        payment_method: selectedPaymentMethodId!,
         confirm: true, // Auto-confirm the payment
         off_session: true, // Indicates this is for saved payment method
         description: `Challenge penalty auto-charge for challenge ${challengeId}`,

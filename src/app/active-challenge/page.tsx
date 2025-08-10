@@ -322,7 +322,8 @@ export default function ActiveChallengePage() {
       if (distance >= 100) {
         // Success: Complete the challenge
         try {
-          const completeResponse = await fetch(`/api/challenges/${challengeId}/complete`, {
+          const cid = challengeData.id || (challengeData as any)?.challengeId || (challengeData as any)?.challenge_id
+          const completeResponse = await fetch(`/api/challenges/${cid}/complete`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -353,8 +354,9 @@ export default function ActiveChallengePage() {
         
         if (currentTime > wakeTime) {
           // Challenge failed - complete as failed
-          try {
-            const completeResponse = await fetch(`/api/challenges/${challengeId}/complete`, {
+            try {
+            const cid = challengeData.id || (challengeData as any)?.challengeId || (challengeData as any)?.challenge_id
+            const completeResponse = await fetch(`/api/challenges/${cid}/complete`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

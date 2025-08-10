@@ -22,9 +22,10 @@ export interface GoogleGeocodeResult {
   types: string[]
 }
 
-// 高速住所取得用のキャッシュ（API節約のため延長）
+// 高速住所取得用のキャッシュ（API節約のため）
 const addressCache = new Map<string, { address: string; timestamp: number }>()
-const CACHE_DURATION = 60 * 60 * 1000 // 1時間に延長（API節約）
+// 初期の誤った住所が残り続けないよう、キャッシュ寿命を短縮
+const CACHE_DURATION = 10 * 60 * 1000 // 10分
 
 // キャッシュクリーンアップ（メモリ節約）- ブラウザのみで実行
 if (typeof window !== 'undefined') {
@@ -63,15 +64,25 @@ function roundCoordinates(lat: number, lng: number, precision: number = 4): { la
  * 座標から日本語住所を取得（API節約機能付き）
  */
 export async function getAddressFromCoords(lat: number, lng: number): Promise<string> {
+  return getAddressFromCoordsWithOptions(lat, lng, { noCache: false })
+}
+
+export async function getAddressFromCoordsWithOptions(
+  lat: number,
+  lng: number,
+  options?: { noCache?: boolean }
+): Promise<string> {
   // 座標を丸めてAPI節約
   const rounded = roundCoordinates(lat, lng, 4)
   const cacheKey = `${rounded.lat},${rounded.lng}`
   
   // キャッシュチェック
-  const cached = addressCache.get(cacheKey)
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    console.log('Google住所キャッシュヒット:', cached.address)
-    return cached.address
+  if (!options?.noCache) {
+    const cached = addressCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log('Google住所キャッシュヒット:', cached.address)
+      return cached.address
+    }
   }
 
 
@@ -130,7 +141,7 @@ export async function getAddressFromCoords(lat: number, lng: number): Promise<st
     console.log('フォーマット済み住所:', formattedAddress)
     console.log('=== Google Geocoding API 完了 ===')
 
-    // キャッシュに保存
+    // キャッシュに保存（新鮮な結果で上書き）
     addressCache.set(cacheKey, { address: formattedAddress, timestamp: Date.now() })
 
     return formattedAddress
@@ -213,7 +224,8 @@ function findComponent(components: GoogleAddressComponent[], types: string[]): G
 export function getAddressFromCoordsDebounced(
   lat: number, 
   lng: number, 
-  callback: (address: string) => void
+  callback: (address: string) => void,
+  options?: { noCache?: boolean }
 ): void {
   const rounded = roundCoordinates(lat, lng, 4)
   const debounceKey = `${rounded.lat},${rounded.lng}`
@@ -227,7 +239,7 @@ export function getAddressFromCoordsDebounced(
   // 新しいタイマーをセット
   const timer = setTimeout(async () => {
     try {
-      const address = await getAddressFromCoords(lat, lng)
+      const address = await getAddressFromCoordsWithOptions(lat, lng, { noCache: options?.noCache })
       callback(address)
     } catch (error) {
       console.error('デバウンシング住所取得エラー:', error)

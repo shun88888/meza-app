@@ -58,12 +58,15 @@ export async function POST(request: NextRequest) {
 
   try {
     // Log webhook event for monitoring
-    await supabase.from('webhook_logs').insert({
+    const { error: logError } = await supabase.from('webhook_logs').insert({
       event_id: event.id,
       event_type: event.type,
       processed_at: new Date().toISOString(),
       status: 'processing'
-    }).catch(err => console.error('Failed to log webhook event:', err))
+    })
+    if (logError) {
+      console.error('Failed to log webhook event:', logError)
+    }
 
     switch (event.type) {
       case 'payment_intent.succeeded': {
@@ -92,7 +95,7 @@ export async function POST(request: NextRequest) {
           .update({ 
             status: 'completed',
             stripe_payment_intent_id: paymentIntent.id,
-            receipt_url: paymentIntent.charges.data[0]?.receipt_url,
+            receipt_url: (paymentIntent as any)?.charges?.data?.[0]?.receipt_url,
             updated_at: new Date().toISOString()
           })
           .eq('stripe_payment_intent_id', paymentIntent.id)
@@ -120,12 +123,15 @@ export async function POST(request: NextRequest) {
         }
 
         // Send success notification
-        await supabase.rpc('send_notification', {
+        const { error: notifyError1 } = await supabase.rpc('send_notification', {
           user_id_param: userId,
           title_param: '決済完了',
           body_param: `ペナルティ料金 ¥${(paymentIntent.amount / 100).toLocaleString()} の決済が完了しました。`,
           type_param: 'payment_success'
-        }).catch(err => console.error('Failed to send notification:', err))
+        })
+        if (notifyError1) {
+          console.error('Failed to send notification:', notifyError1)
+        }
 
         // Log successful processing
         await supabase.from('webhook_logs').update({
@@ -163,12 +169,15 @@ export async function POST(request: NextRequest) {
 
         // Send failure notification with retry option
         if (userId) {
-          await supabase.rpc('send_notification', {
+        const { error: notifyError2 } = await supabase.rpc('send_notification', {
             user_id_param: userId,
             title_param: '決済失敗',
             body_param: `決済に失敗しました。カード情報を確認してください。エラー: ${lastError?.message || '不明なエラー'}`,
             type_param: 'payment_error'
-          }).catch(err => console.error('Failed to send notification:', err))
+          })
+          if (notifyError2) {
+            console.error('Failed to send notification:', notifyError2)
+          }
         }
 
         break

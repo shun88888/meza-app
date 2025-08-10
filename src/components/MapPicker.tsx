@@ -116,10 +116,6 @@ export default function MapPicker({
         {locations.wakeUp && (
           <div className="space-y-2">
             <div className="text-xs">
-              <strong>座標:</strong> {locations.wakeUp.lat.toFixed(4)}, {locations.wakeUp.lng.toFixed(4)}
-            </div>
-            
-            <div className="text-xs">
               <strong>住所:</strong>
               {isLoadingAddress ? (
                 <span className="inline-flex items-center gap-1 ml-1">

@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
       .limit(20)
 
     // Calculate overall system status
-    const criticalAlerts = alerts?.filter(alert => alert.severity === 'critical').length || 0
-    const warningAlerts = alerts?.filter(alert => alert.severity === 'warning').length || 0
+    const criticalAlerts = alerts?.filter((a: any) => a.severity === 'critical').length || 0
+    const warningAlerts = alerts?.filter((a: any) => a.severity === 'warning').length || 0
     
     let systemStatus = 'healthy'
     if (criticalAlerts > 0) {
@@ -148,7 +148,8 @@ export async function POST(request: NextRequest) {
           const result = await response.json()
           results.push({ job: 'expired_challenges', status: response.ok ? 'success' : 'error', result })
         } catch (error) {
-          results.push({ job: 'expired_challenges', status: 'error', error: error.message })
+          const message = (error as Error)?.message || 'Unknown error'
+          results.push({ job: 'expired_challenges', status: 'error', error: message })
         }
       }
 
@@ -166,7 +167,8 @@ export async function POST(request: NextRequest) {
           const result = await response.json()
           results.push({ job: 'retry_payments', status: response.ok ? 'success' : 'error', result })
         } catch (error) {
-          results.push({ job: 'retry_payments', status: 'error', error: error.message })
+          const message = (error as Error)?.message || 'Unknown error'
+          results.push({ job: 'retry_payments', status: 'error', error: message })
         }
       }
 
@@ -184,7 +186,8 @@ export async function POST(request: NextRequest) {
           const result = await response.json()
           results.push({ job: 'push_notifications', status: response.ok ? 'success' : 'error', result })
         } catch (error) {
-          results.push({ job: 'push_notifications', status: 'error', error: error.message })
+          const message = (error as Error)?.message || 'Unknown error'
+          results.push({ job: 'push_notifications', status: 'error', error: message })
         }
       }
 

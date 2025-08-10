@@ -6,7 +6,8 @@ import dynamic from 'next/dynamic'
 import SlideToWake from '@/components/SlideToWake'
 import CountdownScreen from '@/components/CountdownScreen'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { getFormattedAddressFromCoords, formatAddress } from '@/lib/addressFormatter'
+import { formatAddress } from '@/lib/addressFormatter'
+import { getAddressFromCoordsWithOptions } from '@/lib/googleGeocoding'
 import { getPaymentMethods, PaymentMethodInfo } from '@/lib/stripe'
 import { createClientSideClient, getCurrentUser } from '@/lib/supabase'
 
@@ -129,15 +130,8 @@ export default function CreateChallengePage() {
   useEffect(() => {
     if (typeof window === 'undefined') return // SSR時はスキップ
 
-    const setDefaultLocation = () => {
-      setChallengeData(prev => ({
-        ...prev,
-        wakeUpLocation: {
-          lat: 35.6812,
-          lng: 139.7671,
-          address: '東京駅周辺（デフォルト位置）'
-        }
-      }))
+    const clearPreviousActiveChallenge = () => {
+      try { localStorage.removeItem('activeChallenge') } catch {}
     }
 
     // URLパラメータから起床場所が設定されている場合はスキップ
@@ -150,18 +144,16 @@ export default function CreateChallengePage() {
       console.error('URLパラメータ取得エラー:', error)
     }
 
-    // if (challengeData.wakeUpLocation) return // デバッグのため一時的にコメントアウト
+    // ページに入ったら前回のアクティブチャレンジ情報は破棄
+    clearPreviousActiveChallenge()
 
-    if (!navigator?.geolocation) {
-      console.log('位置情報がサポートされていません')
-      setDefaultLocation()
-      return
-    }
+    if (!navigator?.geolocation) return
 
     console.log('現在地を取得中...')
     
-    // 位置情報取得の実行
-    navigator.geolocation.getCurrentPosition(
+    // 位置情報取得の実行（高精度・キャッシュ無効）。初回は5回まで再試行して精度を確保
+    const tryGetCurrentPosition = (attempt = 1) => {
+      navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
           console.log('現在地取得成功:', position.coords.latitude, position.coords.longitude)
@@ -176,16 +168,16 @@ export default function CreateChallengePage() {
             }
           }))
           
-          // 住所を非同期で取得して更新
-          getFormattedAddressFromCoords(position.coords.latitude, position.coords.longitude)
+          // 住所を非同期で取得して更新（最新の緯度経度で上書き）
+          const { latitude, longitude } = position.coords
+          getAddressFromCoordsWithOptions(latitude, longitude, { noCache: true })
             .then(address => {
-              console.log('フォーマット住所取得成功:', address)
               setChallengeData(prev => ({
                 ...prev,
                 wakeUpLocation: {
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude,
-                  address: address
+                  lat: latitude,
+                  lng: longitude,
+                  address
                 }
               }))
             })
@@ -194,15 +186,14 @@ export default function CreateChallengePage() {
               setChallengeData(prev => ({
                 ...prev,
                 wakeUpLocation: {
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude,
-                  address: `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`
+                  lat: latitude,
+                  lng: longitude,
+                  address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
                 }
               }))
             })
         } catch (error) {
           console.error('位置情報処理エラー:', error)
-          setDefaultLocation()
         }
       },
       (error) => {
@@ -232,10 +223,61 @@ export default function CreateChallengePage() {
         }))
       },
       {
-        enableHighAccuracy: false, // より高速な取得のためfalseに変更
-        timeout: 5000, // タイムアウトを5秒に短縮
-        maximumAge: 300000 // 5分間キャッシュを延長
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
       }
+    )
+    }
+
+    tryGetCurrentPosition()
+
+    // 初回取得後により精度の高い値が来たら上書きする（1回だけ）
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        // 最新の高精度座標で即時に座標だけ更新し、住所は再解決する
+        const newLat = pos.coords.latitude
+        const newLng = pos.coords.longitude
+
+        setChallengeData(prev => ({
+          ...prev,
+          wakeUpLocation: {
+            lat: newLat,
+            lng: newLng,
+            // 既存の住所がある場合は一時的に保持しつつ、なければ取得中表示
+            address: prev.wakeUpLocation?.address || '住所を取得中...'
+          }
+        }))
+
+        // 新しい座標に対して住所を再取得して上書き
+        getAddressFromCoordsWithOptions(newLat, newLng, { noCache: true })
+          .then(address => {
+            setChallengeData(prev => ({
+              ...prev,
+              wakeUpLocation: {
+                lat: newLat,
+                lng: newLng,
+                address
+              }
+            }))
+          })
+          .catch(() => {
+            setChallengeData(prev => ({
+              ...prev,
+              wakeUpLocation: {
+                lat: newLat,
+                lng: newLng,
+                address: `${newLat.toFixed(4)}, ${newLng.toFixed(4)}`
+              }
+            }))
+          })
+          .finally(() => {
+            // 初回の高精度更新のみで十分なので監視は解除
+            navigator.geolocation.clearWatch(watchId)
+          })
+      },
+      () => navigator.geolocation.clearWatch(watchId),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     )
   }, [])
 
@@ -391,18 +433,36 @@ export default function CreateChallengePage() {
               },
               (error) => {
                 console.error('Error getting location:', error)
-                // Use mock location if GPS fails
-                resolve({ lat: 35.6762, lng: 139.6503 })
-              }
+                // Fallback: 直前に取得済みの位置を使用
+                if (challengeData.wakeUpLocation) {
+                  resolve({
+                    lat: challengeData.wakeUpLocation.lat,
+                    lng: challengeData.wakeUpLocation.lng
+                  })
+                } else {
+                  // それでも無ければ東京駅
+                  resolve({ lat: 35.6812, lng: 139.7671 })
+                }
+              },
+              { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
             )
           } else {
-            // Use mock location if geolocation not supported
-            resolve({ lat: 35.6762, lng: 139.6503 })
+            // geolocation 非対応時も直前の位置にフォールバック
+            if (challengeData.wakeUpLocation) {
+              resolve({
+                lat: challengeData.wakeUpLocation.lat,
+                lng: challengeData.wakeUpLocation.lng
+              })
+            } else {
+              resolve({ lat: 35.6812, lng: 139.7671 })
+            }
           }
         })
       }
 
       const startLocation = await getLocation()
+      // 現在地の住所を同期的に解決（DBに正しい住所を保存するため）
+      const startAddress = await getAddressFromCoordsWithOptions(startLocation.lat, startLocation.lng, { noCache: true })
       console.log('📍 Start location:', startLocation)
 
       // Create challenge in database
@@ -424,7 +484,7 @@ export default function CreateChallengePage() {
         // Use time-only string to satisfy TIME columns; local storage retains ISO for app logic
         target_time: targetTimeHHMMSS,
         penalty_amount: challengeData.penaltyAmount,
-        home_address: '現在位置',
+        home_address: startAddress,
         home_latitude: startLocation.lat,
         home_longitude: startLocation.lng,
         target_latitude: challengeData.wakeUpLocation?.lat || startLocation.lat,
@@ -535,13 +595,7 @@ export default function CreateChallengePage() {
 
       {/* Background Map */}
       <div className="absolute inset-0 z-0">
-        <style type="text/css">{`
-          #setting-location-map .leaflet-container {
-            width: 100%;
-            height: 100vh;
-            height: 100dvh;
-          }
-        `}</style>
+        {/* Cleaned up old Leaflet CSS remnants */}
         <div id="setting-location-map">
           <ErrorBoundary 
             fallback={

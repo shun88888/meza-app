@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import GoogleMap from './GoogleMap'
 import { getAddressFromCoordsDebounced } from '@/lib/googleGeocoding'
 
@@ -15,18 +15,26 @@ interface GoogleWakeUpLocationPickerProps {
   onLocationSelect: (location: Location) => void
   height?: string
   className?: string
+  // 初回の住所取得でキャッシュを使わない
+  initialNoCache?: boolean
 }
 
 export default function GoogleWakeUpLocationPicker({ 
   location, 
   onLocationSelect, 
   height = '400px', 
-  className = '' 
+  className = '',
+  initialNoCache = false
 }: GoogleWakeUpLocationPickerProps) {
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
+  const initialAddressResolvedRef = useRef(false)
 
   // 住所取得処理（デバウンシング付きでAPI節約）
-  const fetchAddressForLocation = useCallback((lat: number, lng: number) => {
+  const fetchAddressForLocation = useCallback((
+    lat: number, 
+    lng: number,
+    options?: { noCache?: boolean }
+  ) => {
     setIsLoadingAddress(true)
     console.log('住所取得開始:', lat, lng)
     
@@ -40,7 +48,7 @@ export default function GoogleWakeUpLocationPicker({
       console.log('住所取得完了:', newLocation)
       onLocationSelect(newLocation)
       setIsLoadingAddress(false)
-    })
+    }, { noCache: options?.noCache })
   }, [onLocationSelect])
 
   // 地図クリック時の処理
@@ -73,6 +81,16 @@ export default function GoogleWakeUpLocationPicker({
     fetchAddressForLocation(dragLocation.lat, dragLocation.lng)
   }, [fetchAddressForLocation, onLocationSelect])
 
+  // 初回、location が座標のみで住所未設定の場合は自動で住所取得
+  useEffect(() => {
+    if (!location) return
+    const needsResolve = !location.address || location.address === '住所を取得中...'
+    if (needsResolve && !initialAddressResolvedRef.current) {
+      initialAddressResolvedRef.current = true
+      fetchAddressForLocation(location.lat, location.lng, { noCache: initialNoCache })
+    }
+  }, [location, fetchAddressForLocation, initialNoCache])
+
   // マーカーの準備
   const markers = location ? [
     {
@@ -98,10 +116,6 @@ export default function GoogleWakeUpLocationPicker({
         
         {location && (
           <div className="space-y-2">
-            <div className="text-xs">
-              <strong>座標:</strong> {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-            </div>
-            
             <div className="text-xs">
               <strong>住所:</strong>
               {isLoadingAddress ? (

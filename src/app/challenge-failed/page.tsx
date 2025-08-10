@@ -44,9 +44,8 @@ export default function ChallengeFailedPage() {
   }
 
   const handleManualPayment = () => {
-    if (challengeData?.challengeId) {
-      router.push(`/challenge/${challengeData.challengeId}/payment`)
-    }
+    // リクエスト: 手動で完了ボタンでホームへ戻る
+    router.push('/')
   }
 
   if (!mounted) {
@@ -109,7 +108,7 @@ export default function ChallengeFailedPage() {
               onClick={handleManualPayment}
               className="w-full h-14 text-lg font-semibold bg-red-500 hover:bg-red-600 text-white shadow-lg rounded-3xl transition-all duration-200"
             >
-              手動で決済を完了する
+              ホームに戻る
             </button>
           )}
           

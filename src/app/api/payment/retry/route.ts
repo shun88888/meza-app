@@ -105,12 +105,15 @@ export async function POST(request: NextRequest) {
 
     // Send notification about retry attempt
     if (isAutoRetry) {
-      await supabase.rpc('send_notification', {
+      const { error: notifyError } = await supabase.rpc('send_notification', {
         user_id_param: user.id,
         title_param: '決済リトライ実行',
         body_param: `決済の再試行を実行しました（${newRetryCount}回目）`,
         type_param: 'payment_retry'
-      }).catch(err => console.error('Failed to send retry notification:', err))
+      })
+      if (notifyError) {
+        console.error('Failed to send retry notification:', notifyError)
+      }
     }
 
     return NextResponse.json({

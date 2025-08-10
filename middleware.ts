@@ -30,6 +30,8 @@ const publicRoutes = [
   '/external-link-blocked',
   '/signup',
   '/login',
+  // Allow challenge failure page regardless of auth/session state
+  '/challenge-failed',
 ]
 
 // Define blocked routes (deprecated or admin routes)

@@ -12,13 +12,15 @@ export class NotificationManager {
   }
 
   async init(): Promise<boolean> {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.log('Push messaging is not supported');
       return false;
     }
 
     try {
-      this.registration = await navigator.serviceWorker.register('/sw.js');
+      if (!this.registration) {
+        this.registration = await navigator.serviceWorker.register('/sw.js');
+      }
       console.log('Service Worker registered successfully');
       return true;
     } catch (error) {

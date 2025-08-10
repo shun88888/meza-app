@@ -88,9 +88,23 @@ export default function PaymentMethodPage() {
     }
   }
 
-  const handleSetDefault = (id: string) => {
-    // TODO: Implement API call to set default payment method
-    console.log('Setting default payment method:', id)
+  const handleSetDefault = async (id: string) => {
+    try {
+      const resp = await fetch('/api/payment/methods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentMethodId: id, setAsDefault: true })
+      })
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to set default')
+      }
+      alert('デフォルトカードを更新しました')
+      loadPaymentMethods()
+    } catch (e: any) {
+      console.error('Set default error:', e)
+      alert(e?.message || 'デフォルトカードの更新に失敗しました')
+    }
   }
 
   const handleRemove = async (id: string) => {
@@ -136,6 +150,8 @@ export default function PaymentMethodPage() {
             <button 
               onClick={() => router.back()}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="戻る"
+              title="戻る"
             >
               <ArrowDownLeft size={20} className="text-gray-600 rotate-45" />
             </button>
@@ -151,6 +167,8 @@ export default function PaymentMethodPage() {
             <button 
               onClick={() => router.push('/settings/payment/add')}
               className="w-full flex items-center justify-center p-4 bg-[#FFF9E6] hover:bg-[#FFE72E]/20 rounded-2xl transition-colors border border-[#FFE72E]/30"
+              aria-label="新しいカードを追加"
+              title="新しいカードを追加"
             >
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
@@ -185,7 +203,12 @@ export default function PaymentMethodPage() {
                     <div>
                       <p className="font-medium text-gray-900 text-sm">
                         {getCardName(method.card?.brand || '')} •••• {method.card?.last4}
-                        {/* TODO: Add default payment method indicator when API supports it */}
+                        {method.id && (
+                          <span className="ml-2 inline-flex items-center text-xs text-gray-500">
+                            {/* best-effort default indicator: first item considered default when API lacks flag */}
+                            {paymentMethods[0]?.id === method.id ? '（デフォルト）' : ''}
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-gray-500">
                         有効期限: {method.card?.exp_month?.toString().padStart(2, '0')}/{method.card?.exp_year}
@@ -196,12 +219,16 @@ export default function PaymentMethodPage() {
                     <button
                       onClick={() => handleSetDefault(method.id)}
                       className="text-xs text-[#FFAD2F] hover:text-[#FF8A00] font-medium"
+                      aria-label="デフォルトに設定"
+                      title="デフォルトに設定"
                     >
                       デフォルトに設定
                     </button>
                     <button
                       onClick={() => handleRemove(method.id)}
                       className="p-1 text-red-600 hover:text-red-700"
+                      aria-label="カードを削除"
+                      title="カードを削除"
                     >
                       <Trash2 size={16} />
                     </button>
