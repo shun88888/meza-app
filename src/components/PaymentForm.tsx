@@ -11,9 +11,8 @@ import {
 } from '@stripe/react-stripe-js'
 import { createPaymentIntent, confirmPayment } from '@/lib/stripe'
 
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
-)
+const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+const stripePromise = pk ? loadStripe(pk) : Promise.resolve(null)
 
 interface PaymentFormProps {
   challengeId: string
@@ -48,6 +47,7 @@ function CheckoutForm({
     event.preventDefault()
 
     if (!stripe || !elements) {
+      setError('Stripeキーが未設定のため、決済できません')
       return
     }
 

@@ -97,7 +97,8 @@ export async function getAddressFromCoordsWithOptions(
   try {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     if (!apiKey) {
-      throw new Error('Google Maps API key is not configured')
+      // 本番でキー未設定時は例外にせず、座標文字列でフォールバック
+      return `住所取得エラー: Google Maps API key is not configured (${lat.toFixed(4)}, ${lng.toFixed(4)})`
     }
 
     const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${rounded.lat},${rounded.lng}&key=${apiKey}&language=ja&result_type=street_address|premise|sublocality`
@@ -276,7 +277,7 @@ export async function getCoordsFromAddress(address: string): Promise<{ lat: numb
   try {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     if (!apiKey) {
-      throw new Error('Google Maps API key is not configured')
+      return null
     }
 
     const encodedAddress = encodeURIComponent(address)

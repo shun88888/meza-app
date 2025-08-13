@@ -38,7 +38,11 @@ export default function GoogleMap({
     try {
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
       if (!apiKey) {
-        throw new Error('Google Maps API key is not configured')
+        // 本番でキー未設定でもUIは動くように、ローディングをスキップしてプレースホルダーを表示
+        console.warn('Google Maps API key is not configured. Rendering placeholder map.')
+        setError(null)
+        setIsLoaded(false)
+        return
       }
 
       console.log('Google Maps API Key exists:', !!apiKey)
@@ -55,7 +59,13 @@ export default function GoogleMap({
       setIsLoaded(true)
     } catch (err) {
       console.error('Google Maps loading error:', err)
-      setError(`Google Maps の読み込みに失敗しました: ${err instanceof Error ? err.message : String(err)}`)
+      // キー未設定の場合はエラー表示を出さずに控えめなプレースホルダーを残す
+      const message = err instanceof Error ? err.message : String(err)
+      if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+        setError(null)
+      } else {
+        setError(`Google Maps の読み込みに失敗しました: ${message}`)
+      }
     }
   }, [])
 
@@ -174,7 +184,9 @@ export default function GoogleMap({
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-lg">
           <div className="text-center">
             <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-            <div className="text-gray-600 text-sm">Google Maps を読み込み中...</div>
+            <div className="text-gray-600 text-sm">
+              {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? 'Google Maps を読み込み中...' : '地図は現在ご利用いただけません（APIキー未設定）'}
+            </div>
           </div>
         </div>
       )}

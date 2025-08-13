@@ -13,10 +13,11 @@ if (process.env.STRIPE_SECRET_KEY) {
 export async function GET(request: NextRequest) {
   // Check if Stripe is configured
   if (!stripe) {
-    return NextResponse.json(
-      { error: 'Payment service is not configured' },
-      { status: 503 }
-    )
+    // In production without STRIPE_SECRET_KEY, return empty list gracefully
+    return NextResponse.json({
+      paymentMethods: [],
+      hasDefaultMethod: false
+    })
   }
   // At this point, stripe is guaranteed to be non-null
 

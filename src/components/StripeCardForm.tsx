@@ -12,7 +12,8 @@ import {
 } from '@stripe/react-stripe-js'
 import { CreditCard } from 'lucide-react'
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+const stripePromise = pk ? loadStripe(pk) : Promise.resolve(null)
 
 interface StripeCardFormProps {
   onSuccess?: (paymentMethod: any) => void
@@ -30,6 +31,7 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
     event.preventDefault()
 
     if (!stripe || !elements) {
+      setError('Stripeキーが未設定のため、カード登録ができません')
       return
     }
 
