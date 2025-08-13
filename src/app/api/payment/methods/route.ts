@@ -6,8 +6,45 @@ let stripe: Stripe | null = null
 
 if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2023-10-16'
+    apiVersion: '2023-10-16',
+    // Increase resilience to transient network issues
+    maxNetworkRetries: 3,
+    timeout: 60000,
   })
+}
+
+// Simple exponential backoff retry helper for transient errors
+async function withRetries<T>(
+  fn: () => Promise<T>,
+  retries: number = 2,
+  baseDelayMs: number = 300
+): Promise<T> {
+  let attempt = 0
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      return await fn()
+    } catch (error: any) {
+      attempt += 1
+      const isStripeError = error && (error as any).type
+      const status = (error as any)?.statusCode as number | undefined
+      const retriable =
+        // Stripe connection/server errors
+        (isStripeError && (
+          (error as any).type === 'api_connection_error' ||
+          (error as any).type === 'api_error' ||
+          (error as any).type === 'rate_limit_error'
+        )) ||
+        // Generic 5xx
+        (typeof status === 'number' && status >= 500)
+
+      if (!retriable || attempt > retries) {
+        throw error
+      }
+      const delay = baseDelayMs * Math.pow(2, attempt - 1)
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -43,14 +80,18 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get payment methods from Stripe
-    const paymentMethods = await stripe.paymentMethods.list({
-      customer: profile.stripe_customer_id,
-      type: 'card',
-    })
+    // Get payment methods from Stripe (with retry)
+    const paymentMethods = await withRetries(() =>
+      stripe!.paymentMethods.list({
+        customer: profile.stripe_customer_id,
+        type: 'card',
+      })
+    )
 
-    // Get customer to check default payment method
-    const customer = await stripe.customers.retrieve(profile.stripe_customer_id)
+    // Get customer to check default payment method (with retry)
+    const customer = await withRetries(() =>
+      stripe!.customers.retrieve(profile.stripe_customer_id)
+    )
     
     const defaultPaymentMethodId = typeof customer !== 'string' && !('deleted' in customer) && customer.invoice_settings?.default_payment_method
       ? customer.invoice_settings.default_payment_method
@@ -136,7 +177,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Attach payment method to customer if needed
-    const existingPm = await stripe.paymentMethods.retrieve(paymentMethodId)
+    const existingPm = await withRetries(() =>
+      stripe!.paymentMethods.retrieve(paymentMethodId)
+    )
     if (existingPm.customer && existingPm.customer !== customerId) {
       return NextResponse.json({
         error: 'This payment method is already attached to another customer'
@@ -144,13 +187,20 @@ export async function POST(request: NextRequest) {
     }
 
     if (!existingPm.customer) {
-      await stripe.paymentMethods.attach(paymentMethodId, {
-        customer: customerId,
-      })
+      const idemKey = `attach_${paymentMethodId}_${user.id}`
+      await withRetries(() =>
+        stripe!.paymentMethods.attach(
+          paymentMethodId,
+          { customer: customerId },
+          { idempotencyKey: idemKey }
+        )
+      )
     }
 
     // Ensure local record exists (upsert minimal fields)
-    const attachedPm = await stripe.paymentMethods.retrieve(paymentMethodId)
+    const attachedPm = await withRetries(() =>
+      stripe!.paymentMethods.retrieve(paymentMethodId)
+    )
     if (attachedPm && attachedPm.type === 'card' && attachedPm.card) {
       const { data: existing } = await supabase
         .from('payment_methods')
@@ -180,11 +230,18 @@ export async function POST(request: NextRequest) {
 
     // Set as default if requested
     if (setAsDefault) {
-      await stripe.customers.update(customerId, {
-        invoice_settings: {
-          default_payment_method: paymentMethodId,
-        },
-      })
+      const idemKey = `set_default_${paymentMethodId}_${user.id}`
+      await withRetries(() =>
+        stripe!.customers.update(
+          customerId,
+          {
+            invoice_settings: {
+              default_payment_method: paymentMethodId,
+            },
+          },
+          { idempotencyKey: idemKey }
+        )
+      )
 
       // Supabase側のデフォルトフラグも同期
       await supabase
