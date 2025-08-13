@@ -181,7 +181,7 @@ async function testPayment() {
   
   try {
     // 開発サーバーが起動しているかチェック
-    const response = await fetch('http://localhost:3000/api/setup-payment-method', {
+    const response = await fetch('http://localhost:3000/api/payment-methods', {
       method: 'HEAD'
     }).catch(() => null);
     

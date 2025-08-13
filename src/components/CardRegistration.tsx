@@ -77,14 +77,14 @@ function CardRegistrationForm({
 
       // Setup payment method
       console.log('Setting up payment method for user:', userId)
-      const response = await fetch('/api/setup-payment-method', {
+      const response = await fetch('/api/payment-methods', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId,
-          paymentMethodId: paymentMethod.id,
+          payment_method_id: paymentMethod.id,
+          cardholder_name: undefined,
         }),
       })
 

@@ -134,7 +134,7 @@ export default function PaymentMethodPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <div className="max-w-md mx-auto bg-white min-h-screen">
         {/* Header */}
         <div className="px-4 py-6 border-b border-gray-100">
@@ -158,7 +158,7 @@ export default function PaymentMethodPage() {
           <div className="mb-4">
             <Link 
               href="/settings/payment/add"
-              className="w-full flex items-center justify-center p-4 bg-[#FFF9E6] hover:bg-[#FFE72E]/20 rounded-2xl transition-colors border border-[#FFE72E]/30"
+              className="w-full flex items-center justify-center p-4 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors border border-gray-200"
               aria-label="新しいカードを追加"
               title="新しいカードを追加"
             >
@@ -232,7 +232,7 @@ export default function PaymentMethodPage() {
 
 
           {/* Payment Info */}
-          <div className="bg-[#FFF9E6] rounded-2xl p-4 border border-[#FFE72E]/30">
+          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
             <h3 className="font-semibold text-gray-900 mb-2">決済について</h3>
             <div className="space-y-2 text-sm text-gray-700">
               <p>• チャレンジに失敗した場合のみ、設定したペナルティ金額が決済されます</p>

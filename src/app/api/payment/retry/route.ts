@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Update payment intent with new payment method
-              updatedPaymentIntent = await stripe.paymentIntents.update(paymentIntentId, {
+      updatedPaymentIntent = await stripe.paymentIntents.update(paymentIntentId, {
         payment_method: paymentMethodId,
       })
 

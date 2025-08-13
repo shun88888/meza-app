@@ -254,25 +254,28 @@ export default function ActiveChallengePage() {
         localStorage.setItem('failedChallengeData', JSON.stringify({
           penaltyAmount: challengeData.penaltyAmount,
           reason: '起床時間を過ぎました',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          paymentIntentId: autoChargeResult.paymentIntentId || undefined
         }))
         
         localStorage.removeItem('activeChallenge')
         router.push('/challenge-failed')
       } else {
+        // Preserve details for retry (paymentIntent for 3DS)
+        localStorage.setItem('failedChallengeData', JSON.stringify({
+          penaltyAmount: challengeData.penaltyAmount,
+          reason: '起床時間を過ぎました（決済処理が必要です）',
+          timestamp: new Date().toISOString(),
+          needsManualPayment: true,
+          challengeId: challengeId,
+          paymentIntentId: autoChargeResult.paymentIntentId || undefined
+        }))
         throw new Error(autoChargeResult.error || 'Auto charge failed')
       }
     } catch (error) {
       console.error('Auto charge error:', error)
       
-      // Even if auto-charge fails, still show failure screen with manual payment option
-      localStorage.setItem('failedChallengeData', JSON.stringify({
-        penaltyAmount: challengeData.penaltyAmount,
-        reason: '起床時間を過ぎました（決済処理が必要です）',
-        timestamp: new Date().toISOString(),
-        needsManualPayment: true,
-        challengeId: challengeId
-      }))
+      // failedChallengeData は上で保存済み
       
       localStorage.removeItem('activeChallenge')
       router.push('/challenge-failed')

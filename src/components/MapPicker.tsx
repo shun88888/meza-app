@@ -99,39 +99,7 @@ export default function MapPicker({
 
   return (
     <div className={`relative w-full ${className}`} style={{ height }}>
-      {/* 地図上部の説明パネル */}
-      <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 z-10 max-w-sm">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-          <span className="text-sm font-medium">起床場所設定</span>
-        </div>
-        
-        <p className="text-xs text-gray-600 mb-3">
-          地図をタップまたはピンをドラッグして起床場所を設定してください
-        </p>
-        
-        {locations.wakeUp && (
-          <div className="space-y-2">
-            <div className="text-xs">
-              <strong>住所:</strong>
-              {isLoadingAddress ? (
-                <span className="inline-flex items-center gap-1 ml-1">
-                  <div className="w-3 h-3 border border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                  取得中...
-                </span>
-              ) : (
-                <span className="ml-1">{locations.wakeUp.address || '取得できませんでした'}</span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {!locations.wakeUp && (
-          <div className="text-xs text-gray-500">
-            地図をタップして起床場所を設定してください
-          </div>
-        )}
-      </div>
+      {/* 上部のカード（説明・住所表示）は非表示化 */}
 
       {/* Google Map */}
       <GoogleMap

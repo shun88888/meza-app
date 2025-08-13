@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { loadStripe } from '@stripe/stripe-js'
 
 export default function ChallengeFailedPage() {
   const [mounted, setMounted] = useState(false)
@@ -43,9 +44,55 @@ export default function ChallengeFailedPage() {
     router.push('/history')
   }
 
-  const handleManualPayment = () => {
-    // リクエスト: 手動で完了ボタンでホームへ戻る
-    router.push('/')
+  const handleManualPayment = async () => {
+    try {
+      const stored = localStorage.getItem('failedChallengeData')
+      const data = stored ? JSON.parse(stored) : null
+      if (!data?.paymentIntentId) {
+        router.push('/')
+        return
+      }
+
+      const resp = await fetch('/api/payment/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentIntentId: data.paymentIntentId })
+      })
+
+      const result = await resp.json()
+      if (!resp.ok) {
+        alert(result.error || '決済の再試行に失敗しました')
+        return
+      }
+
+      if (result.paymentIntent?.status === 'requires_action' && result.paymentIntent?.client_secret) {
+        const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+        if (stripe) {
+          const { error: actionError } = await stripe.handleCardAction(result.paymentIntent.client_secret)
+          if (actionError) {
+            alert(actionError.message || '追加認証に失敗しました')
+            return
+          }
+          // 追加認証成功後、サーバー側で最終確認
+          const confirmResp = await fetch('/api/payment/retry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentIntentId: result.paymentIntent.id })
+          })
+          const confirmJson = await confirmResp.json()
+          if (!confirmResp.ok || (confirmJson.paymentIntent?.status !== 'succeeded' && confirmJson.paymentIntent?.status !== 'requires_capture')) {
+            alert(confirmJson.error || '決済の最終確認に失敗しました')
+            return
+          }
+        }
+      }
+
+      alert('決済の再試行が完了しました')
+      router.push('/')
+    } catch (e) {
+      console.error('Manual payment retry error:', e)
+      alert('決済の再試行に失敗しました')
+    }
   }
 
   if (!mounted) {
@@ -57,7 +104,7 @@ export default function ChallengeFailedPage() {
   }
 
   return (
-    <div className="min-h-screen bg-red-50 flex items-center justify-center px-6">
+    <div className="min-h-screen bg-white flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         {/* Failed Icon */}
         <div className="text-center mb-8">
@@ -83,7 +130,7 @@ export default function ChallengeFailedPage() {
               <div className="text-4xl font-bold text-red-500 mb-2">
                 ¥{challengeData.penaltyAmount.toLocaleString()}
               </div>
-              <p className="text-sm text-gray-500">自動決済完了</p>
+              <p className="text-sm text-gray-500">自動決済完了または後で再試行</p>
             </div>
           </div>
         )}
@@ -108,7 +155,7 @@ export default function ChallengeFailedPage() {
               onClick={handleManualPayment}
               className="w-full h-14 text-lg font-semibold bg-red-500 hover:bg-red-600 text-white shadow-lg rounded-3xl transition-all duration-200"
             >
-              ホームに戻る
+              決済を再試行する
             </button>
           )}
           
@@ -128,9 +175,9 @@ export default function ChallengeFailedPage() {
         </div>
 
         {/* Tips */}
-        <div className="mt-8 bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
-          <h3 className="text-sm font-semibold text-yellow-800 mb-2">💡 成功のコツ</h3>
-          <ul className="text-xs text-yellow-700 space-y-1">
+        <div className="mt-8 bg-gray-50 rounded-2xl p-4 border border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">💡 成功のコツ</h3>
+          <ul className="text-xs text-gray-700 space-y-1">
             <li>• 前日の夜は早めに就寝しましょう</li>
             <li>• スマホは手の届かない場所に置きましょう</li>
             <li>• 目覚まし時間を少し早めに設定してみましょう</li>

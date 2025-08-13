@@ -43,13 +43,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Get payment methods from Stripe
-    if (!stripe) {
-      return NextResponse.json(
-        { error: 'Payment service is not configured' },
-        { status: 503 }
-      )
-    }
-    
     const paymentMethods = await stripe.paymentMethods.list({
       customer: profile.stripe_customer_id,
       type: 'card',
@@ -147,10 +140,48 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id)
     }
 
-    // Attach payment method to customer
-    await stripe.paymentMethods.attach(paymentMethodId, {
-      customer: customerId,
-    })
+    // Attach payment method to customer if needed
+    const existingPm = await stripe.paymentMethods.retrieve(paymentMethodId)
+    if (existingPm.customer && existingPm.customer !== customerId) {
+      return NextResponse.json({
+        error: 'This payment method is already attached to another customer'
+      }, { status: 400 })
+    }
+
+    if (!existingPm.customer) {
+      await stripe.paymentMethods.attach(paymentMethodId, {
+        customer: customerId,
+      })
+    }
+
+    // Ensure local record exists (upsert minimal fields)
+    const attachedPm = await stripe.paymentMethods.retrieve(paymentMethodId)
+    if (attachedPm && attachedPm.type === 'card' && attachedPm.card) {
+      const { data: existing } = await supabase
+        .from('payment_methods')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('stripe_payment_method_id', paymentMethodId)
+        .maybeSingle()
+
+      if (!existing) {
+        await supabase
+          .from('payment_methods')
+          .insert({
+            user_id: user.id,
+            last4: attachedPm.card.last4,
+            brand: attachedPm.card.brand,
+            exp_month: attachedPm.card.exp_month,
+            exp_year: attachedPm.card.exp_year,
+            cardholder_name: undefined,
+            is_default: false,
+            stripe_customer_id: customerId,
+            stripe_payment_method_id: attachedPm.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+      }
+    }
 
     // Set as default if requested
     if (setAsDefault) {
@@ -159,6 +190,18 @@ export async function POST(request: NextRequest) {
           default_payment_method: paymentMethodId,
         },
       })
+
+      // Supabase側のデフォルトフラグも同期
+      await supabase
+        .from('payment_methods')
+        .update({ is_default: false, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+
+      await supabase
+        .from('payment_methods')
+        .update({ is_default: true, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('stripe_payment_method_id', paymentMethodId)
     }
 
     return NextResponse.json({ 
@@ -221,8 +264,72 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Payment method not found or unauthorized' }, { status: 404 })
     }
 
-    // Detach payment method
-          await stripe.paymentMethods.detach(paymentMethodId)
+    // Check if this payment method is default
+    const customer = await stripe.customers.retrieve(profile.stripe_customer_id)
+    const defaultPaymentMethodId = typeof customer !== 'string' && !('deleted' in customer)
+      ? (customer.invoice_settings?.default_payment_method as string | null)
+      : null
+    const wasDefault = defaultPaymentMethodId === paymentMethodId
+
+    // Detach payment method on Stripe
+    await stripe.paymentMethods.detach(paymentMethodId)
+
+    // Remove from local DB as well
+    await supabase
+      .from('payment_methods')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('stripe_payment_method_id', paymentMethodId)
+
+    // If it was default, pick another as default (Stripe + Supabase)
+    if (wasDefault) {
+      const remaining = await stripe.paymentMethods.list({
+        customer: profile.stripe_customer_id,
+        type: 'card',
+      })
+
+      if (remaining.data.length > 0) {
+        const newDefault = remaining.data[0]
+        await stripe.customers.update(profile.stripe_customer_id, {
+          invoice_settings: { default_payment_method: newDefault.id },
+        })
+
+        // Sync Supabase flags
+        await supabase
+          .from('payment_methods')
+          .update({ is_default: false, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+
+        const { data: existing } = await supabase
+          .from('payment_methods')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('stripe_payment_method_id', newDefault.id)
+          .maybeSingle()
+
+        if (existing) {
+          await supabase
+            .from('payment_methods')
+            .update({ is_default: true, updated_at: new Date().toISOString() })
+            .eq('id', existing.id)
+        } else if (newDefault.card) {
+          await supabase
+            .from('payment_methods')
+            .insert({
+              user_id: user.id,
+              last4: newDefault.card.last4,
+              brand: newDefault.card.brand,
+              exp_month: newDefault.card.exp_month,
+              exp_year: newDefault.card.exp_year,
+              is_default: true,
+              stripe_customer_id: profile.stripe_customer_id,
+              stripe_payment_method_id: newDefault.id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+        }
+      }
+    }
 
     return NextResponse.json({ 
       success: true,

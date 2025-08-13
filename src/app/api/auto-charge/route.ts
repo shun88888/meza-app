@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         })
 
         if (stripePmList.data.length > 0) {
-          // determine default
+          // determine default (Stripeの実デフォルト優先)
           const customer = await stripe.customers.retrieve(profile.stripe_customer_id)
           const defaultPmId = typeof customer !== 'string' && !('deleted' in customer)
             ? (customer.invoice_settings?.default_payment_method as string | null)
@@ -73,21 +73,50 @@ export async function POST(request: NextRequest) {
           selectedCustomerId = profile.stripe_customer_id
           selectedPaymentMethodId = chosen.id
 
-          // Optionally backfill into local table for next time
+          // Backfill into local table (同期反映)
           try {
-            await supabase.from('payment_methods').insert({
-              user_id: user.id,
-              last4: chosen.card?.last4 || null,
-              brand: chosen.card?.brand || null,
-              exp_month: chosen.card?.exp_month || null,
-              exp_year: chosen.card?.exp_year || null,
-              cardholder_name: undefined,
-              is_default: !!defaultPmId && chosen.id === defaultPmId,
-              stripe_customer_id: profile.stripe_customer_id,
-              stripe_payment_method_id: chosen.id,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
+            // まず全てのis_defaultをfalseに
+            await supabase
+              .from('payment_methods')
+              .update({ is_default: false, updated_at: new Date().toISOString() })
+              .eq('user_id', user.id)
+
+            // 存在すれば更新、なければ挿入
+            const { data: existing } = await supabase
+              .from('payment_methods')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('stripe_payment_method_id', chosen.id)
+              .maybeSingle()
+
+            if (existing) {
+              await supabase
+                .from('payment_methods')
+                .update({
+                  last4: chosen.card?.last4 || null,
+                  brand: chosen.card?.brand || null,
+                  exp_month: chosen.card?.exp_month || null,
+                  exp_year: chosen.card?.exp_year || null,
+                  is_default: true,
+                  stripe_customer_id: profile.stripe_customer_id,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existing.id)
+            } else {
+              await supabase.from('payment_methods').insert({
+                user_id: user.id,
+                last4: chosen.card?.last4 || null,
+                brand: chosen.card?.brand || null,
+                exp_month: chosen.card?.exp_month || null,
+                exp_year: chosen.card?.exp_year || null,
+                cardholder_name: undefined,
+                is_default: true,
+                stripe_customer_id: profile.stripe_customer_id,
+                stripe_payment_method_id: chosen.id,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+            }
           } catch (_) {
             // ignore backfill errors
           }
@@ -157,10 +186,17 @@ export async function POST(request: NextRequest) {
           error_message: stripeError.message
         })
 
+      // Try to surface payment intent info for client-side 3DS handling
+      const raw = stripeError?.raw || stripeError
+      const pi = raw?.payment_intent as Stripe.PaymentIntent | undefined
+
       return NextResponse.json({ 
         success: false,
         error: 'Auto-charge failed',
-        details: stripeError.message 
+        details: stripeError.message,
+        paymentIntentId: pi?.id,
+        clientSecret: pi?.client_secret,
+        status: pi?.status
       }, { status: 400 })
     }
 

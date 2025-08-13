@@ -113,8 +113,8 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
     <div className="max-w-md mx-auto">
       <div className="mb-6">
         <div className="flex items-center space-x-3 mb-4">
-          <div className="w-12 h-12 bg-[#FFF7CC] rounded-full flex items-center justify-center">
-            <CreditCard size={24} className="text-white" />
+          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+            <CreditCard size={24} className="text-gray-700" />
           </div>
           <div>
             <h2 className="text-xl font-semibold text-gray-900">
@@ -146,7 +146,7 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
         {/* カード番号 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">カード番号</label>
-          <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-[#FFE680] focus-within:border-transparent">
+          <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-gray-200 focus-within:border-transparent">
             <CardNumberElement options={cardElementOptions as any} />
           </div>
         </div>
@@ -155,13 +155,13 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">有効期限 (MM/YY)</label>
-            <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-[#FFE680] focus-within:border-transparent">
+            <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-gray-200 focus-within:border-transparent">
               <CardExpiryElement options={cardElementOptions as any} />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">セキュリティコード</label>
-            <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-[#FFE680] focus-within:border-transparent">
+            <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-gray-200 focus-within:border-transparent">
               <CardCvcElement options={cardElementOptions as any} />
             </div>
           </div>
@@ -182,7 +182,7 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
             className={`flex-1 py-3 px-4 rounded-2xl font-medium transition-colors ${
               !stripe || isLoading
                 ? 'bg-gray-400 text-white cursor-not-allowed'
-                : 'bg-[#FFCC00] hover:bg-[#FFB800] text-gray-900'
+            : 'bg-gray-900 hover:bg-gray-800 text-white'
             }`}
           >
             {isLoading ? '登録中...' : 'カードを登録'}
@@ -202,7 +202,7 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
       </form>
 
       {/* セキュリティ情報 */}
-      <div className="mt-6 p-4 bg-[#FFF9E6] rounded-2xl border border-[#FFE72E]/30">
+      <div className="mt-6 p-4 bg-gray-50 rounded-2xl border border-gray-200">
         <h3 className="font-semibold text-gray-900 mb-2 text-sm">🔒 セキュリティについて</h3>
         <div className="space-y-1 text-xs text-gray-700">
           <p>• カード情報はStripeが安全に処理します</p>

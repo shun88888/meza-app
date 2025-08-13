@@ -47,7 +47,7 @@ export default function PaymentSuccessPage() {
         <div className="space-y-3">
           <button
             onClick={() => router.push('/')}
-            className="w-full bg-[#FFAD2F] hover:bg-[#FF9A1F] text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+            className="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
           >
             ホームに戻る
           </button>

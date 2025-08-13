@@ -145,7 +145,8 @@ export async function setupPaymentMethod(
 
 // Get user's payment methods
 export async function getPaymentMethods(userId: string): Promise<PaymentMethodsResponse> {
-  const response = await fetch(`/api/setup-payment-method?user_id=${userId}`, {
+  // userId はサーバー側で検証されるため、ここでは使用せずに統一エンドポイントを叩く
+  const response = await fetch(`/api/payment/methods`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -157,7 +158,22 @@ export async function getPaymentMethods(userId: string): Promise<PaymentMethodsR
     throw new Error(errorData.error || 'Failed to get payment methods')
   }
 
-  return response.json()
+  const data = await response.json()
+  // Normalize to PaymentMethodsResponse shape (wrap flat fields into card object)
+  const methods: PaymentMethodInfo[] = (data.paymentMethods || []).map((pm: any) => ({
+    id: pm.id,
+    type: 'card',
+    card: {
+      brand: pm.brand,
+      last4: pm.last4,
+      exp_month: pm.exp_month,
+      exp_year: pm.exp_year,
+    },
+  }))
+  return {
+    hasPaymentMethod: methods.length > 0,
+    paymentMethods: methods,
+  }
 }
 
 // Auto charge penalty
