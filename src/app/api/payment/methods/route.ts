@@ -72,17 +72,11 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching payment methods:', error)
-    
-    if (error instanceof Stripe.errors.StripeError) {
-      return NextResponse.json({
-        error: `Stripe error: ${error.message}`
-      }, { status: 400 })
-    }
-
-    return NextResponse.json(
-      { error: 'Failed to fetch payment methods' },
-      { status: 500 }
-    )
+    // 本番でStripe接続や顧客未整合があってもUIを壊さない
+    return NextResponse.json({
+      paymentMethods: [],
+      hasDefaultMethod: false
+    })
   }
 }
 
