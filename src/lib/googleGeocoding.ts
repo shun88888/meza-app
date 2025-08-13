@@ -24,6 +24,8 @@ export interface GoogleGeocodeResult {
 
 // 高速住所取得用のキャッシュ（API節約のため）
 const addressCache = new Map<string, { address: string; timestamp: number }>()
+// 同一座標への同時リクエストを合流するための in-flight 管理
+const inflightRequests = new Map<string, Promise<string>>()
 // 初期の誤った住所が残り続けないよう、キャッシュ寿命を短縮
 const CACHE_DURATION = 10 * 60 * 1000 // 10分
 
@@ -85,6 +87,12 @@ export async function getAddressFromCoordsWithOptions(
     }
   }
 
+  // 進行中の同一キーのリクエストがあればそこに合流
+  const inflight = inflightRequests.get(cacheKey)
+  if (inflight) {
+    console.log('Google住所取得: 進行中のリクエストに合流 ->', cacheKey)
+    return inflight
+  }
 
   try {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -98,53 +106,62 @@ export async function getAddressFromCoordsWithOptions(
     console.log('元座標:', lat, lng)
     console.log('丸め座標:', rounded.lat, rounded.lng)
 
-    const response = await fetch(url)
-    
-    if (!response.ok) {
-      throw new Error(`Google API error: ${response.status} ${response.statusText}`)
+    const request = (async () => {
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        throw new Error(`Google API error: ${response.status} ${response.statusText}`)
+      }
+  
+      const data = await response.json()
+      
+      if (data.status !== 'OK') {
+        console.error('Google Geocoding API error:', data.status, data.error_message)
+        throw new Error(`Geocoding failed: ${data.status}`)
+      }
+  
+      if (!data.results || data.results.length === 0) {
+        throw new Error('No address results found')
+      }
+  
+      // 町丁目レベルの結果を優先選択
+      let result: GoogleGeocodeResult
+      
+      // 「丁目」「町」「大字」を含む住所を探す
+      const townLevelResult = data.results.find((r: GoogleGeocodeResult) => 
+        r.formatted_address.includes('丁目') || 
+        r.formatted_address.includes('町') ||
+        r.formatted_address.includes('大字')
+      )
+      
+      if (townLevelResult) {
+        console.log('町丁目レベルの結果を選択:', townLevelResult.formatted_address)
+        result = townLevelResult
+      } else {
+        // 町丁目レベルがなければ最初の結果
+        result = data.results[0] as GoogleGeocodeResult
+      }
+      
+      console.log('Google API結果:', result)
+      
+      // 日本語住所のフォーマット
+      const formattedAddress = formatJapaneseAddress(result)
+      
+      console.log('フォーマット済み住所:', formattedAddress)
+      console.log('=== Google Geocoding API 完了 ===')
+      
+      // キャッシュに保存（新鮮な結果で上書き）
+      addressCache.set(cacheKey, { address: formattedAddress, timestamp: Date.now() })
+      
+      return formattedAddress
+    })()
+
+    inflightRequests.set(cacheKey, request)
+    try {
+      return await request
+    } finally {
+      inflightRequests.delete(cacheKey)
     }
-
-    const data = await response.json()
-    
-    if (data.status !== 'OK') {
-      console.error('Google Geocoding API error:', data.status, data.error_message)
-      throw new Error(`Geocoding failed: ${data.status}`)
-    }
-
-    if (!data.results || data.results.length === 0) {
-      throw new Error('No address results found')
-    }
-
-    // 町丁目レベルの結果を優先選択
-    let result: GoogleGeocodeResult
-    
-    // 「丁目」「町」「大字」を含む住所を探す
-    const townLevelResult = data.results.find((r: GoogleGeocodeResult) => 
-      r.formatted_address.includes('丁目') || 
-      r.formatted_address.includes('町') ||
-      r.formatted_address.includes('大字')
-    )
-    
-    if (townLevelResult) {
-      console.log('町丁目レベルの結果を選択:', townLevelResult.formatted_address)
-      result = townLevelResult
-    } else {
-      // 町丁目レベルがなければ最初の結果
-      result = data.results[0] as GoogleGeocodeResult
-    }
-    
-    console.log('Google API結果:', result)
-    
-    // 日本語住所のフォーマット
-    const formattedAddress = formatJapaneseAddress(result)
-    
-    console.log('フォーマット済み住所:', formattedAddress)
-    console.log('=== Google Geocoding API 完了 ===')
-
-    // キャッシュに保存（新鮮な結果で上書き）
-    addressCache.set(cacheKey, { address: formattedAddress, timestamp: Date.now() })
-
-    return formattedAddress
 
   } catch (error) {
     console.error('Google住所取得エラー:', error)

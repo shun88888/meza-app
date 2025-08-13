@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import GoogleMap from './GoogleMap'
 import { getAddressFromCoordsDebounced } from '@/lib/googleGeocoding'
 
@@ -80,28 +80,25 @@ export default function MapPicker({
     fetchAddressForLocation(dragLocation.lat, dragLocation.lng, selectedLocationType)
   }, [fetchAddressForLocation, onLocationSelect, selectedLocationType])
 
-  // マーカーの準備
-  const markers = []
-  
-  if (locations.wakeUp) {
-    markers.push({
+  // マーカーの準備（メモ化）
+  const markers = useMemo(() => {
+    if (!locations.wakeUp) return [] as Array<{ position: { lat: number; lng: number }; title: string; draggable: boolean; onDragEnd: (loc: {lat:number; lng:number}) => void }>
+    return [{
       position: { lat: locations.wakeUp.lat, lng: locations.wakeUp.lng },
       title: '起床場所',
       draggable: true,
       onDragEnd: handleMarkerDragEnd
-    })
-  }
+    }]
+  }, [locations.wakeUp?.lat, locations.wakeUp?.lng, handleMarkerDragEnd])
 
-  // 地図の中心を決定
-  const getMapCenter = () => {
-    if (locations.wakeUp) {
-      return { lat: locations.wakeUp.lat, lng: locations.wakeUp.lng }
-    }
-    return { lat: 35.6762, lng: 139.6503 } // 東京をデフォルト
-  }
+  // 地図の中心を決定（メモ化）
+  const mapCenter = useMemo(() => {
+    if (locations.wakeUp) return { lat: locations.wakeUp.lat, lng: locations.wakeUp.lng }
+    return { lat: 35.6762, lng: 139.6503 }
+  }, [locations.wakeUp?.lat, locations.wakeUp?.lng])
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative w-full ${className}`} style={{ height }}>
       {/* 地図上部の説明パネル */}
       <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 z-10 max-w-sm">
         <div className="flex items-center gap-2 mb-3">
@@ -138,7 +135,7 @@ export default function MapPicker({
 
       {/* Google Map */}
       <GoogleMap
-        center={getMapCenter()}
+        center={mapCenter}
         zoom={18}
         height={height}
         onClick={handleMapClick}

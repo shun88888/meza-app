@@ -121,6 +121,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="theme-color" content="#FFFFFF" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <link rel="preload" as="image" href="/marker-target.svg" />
       </head>
       <body className={`${inter.className} antialiased min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
         <ErrorBoundary>

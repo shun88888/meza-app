@@ -115,8 +115,7 @@ export default function SwipeHandler({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchCancel}
-      className={className}
-      style={{ touchAction: 'pan-y' }}
+      className={`${className} touch-pan-y`}
     >
       {children}
     </div>

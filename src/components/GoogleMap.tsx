@@ -62,6 +62,8 @@ export default function GoogleMap({
   // マップ初期化
   const initializeMap = useCallback(() => {
     if (!mapRef.current || !isLoaded) return
+    // すでに初期化済みなら再初期化しない（重複ログ/ちらつき防止）
+    if (mapInstanceRef.current) return
 
     try {
       const map = new google.maps.Map(mapRef.current, {
@@ -105,7 +107,7 @@ export default function GoogleMap({
 
   // マーカー管理
   const updateMarkers = useCallback(() => {
-    if (!mapInstanceRef.current) return
+    if (!mapInstanceRef.current || !isLoaded) return
 
     // 既存のマーカーをクリア
     markersRef.current.forEach(marker => marker.setMap(null))
@@ -123,7 +125,8 @@ export default function GoogleMap({
           scaledSize: new google.maps.Size(40, 40),
           anchor: new google.maps.Point(20, 40),
         },
-        optimized: true,
+        optimized: false,
+        zIndex: 1000 + index,
       })
 
       // ドラッグイベント
@@ -164,39 +167,25 @@ export default function GoogleMap({
     }
   }, [center])
 
-  if (error) {
-    return (
-      <div 
-        className={`flex items-center justify-center bg-gray-100 rounded-lg ${className}`}
-        style={{ height, width }}
-      >
-        <div className="text-center">
-          <div className="text-red-500 text-sm mb-2">⚠️</div>
-          <div className="text-red-600 text-sm">{error}</div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isLoaded) {
-    return (
-      <div 
-        className={`flex items-center justify-center bg-gray-50 rounded-lg ${className}`}
-        style={{ height, width }}
-      >
-        <div className="text-center">
-          <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-          <div className="text-gray-600 text-sm">Google Maps を読み込み中...</div>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div 
-      ref={mapRef}
-      className={`rounded-lg ${className}`}
-      style={{ height, width }}
-    />
+    <div className={`relative rounded-lg w-full ${className}`} style={{ height, width }}>
+      <div ref={mapRef} className="absolute inset-0 rounded-lg" />
+      {!isLoaded && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-lg">
+          <div className="text-center">
+            <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+            <div className="text-gray-600 text-sm">Google Maps を読み込み中...</div>
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+          <div className="text-center">
+            <div className="text-red-500 text-sm mb-2">⚠️</div>
+            <div className="text-red-600 text-sm">{error}</div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

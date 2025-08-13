@@ -15,7 +15,7 @@ import { createClientSideClient, getCurrentUser } from '@/lib/supabase'
 const MapPicker = dynamic(() => import('../../components/MapPicker'), {
   ssr: false,
   loading: () => (
-    <div className="loading-container" style={{ height: '612px' }}>
+    <div className="loading-container h-full w-full flex items-center justify-center">
       <div>地図を読み込み中...</div>
     </div>
   )
@@ -44,33 +44,16 @@ export default function CreateChallengePage() {
   useEffect(() => {
     try {
       let metaThemeColor = document.querySelector('meta[name="theme-color"]')
-      const themeColor = showCountdown ? '#FED7AA' : '#ffffff'
-      const bgGradient = showCountdown 
-        ? 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)'
-        : 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)'
-      
       if (!metaThemeColor) {
         const meta = document.createElement('meta')
         meta.name = 'theme-color'
         document.head.appendChild(meta)
         metaThemeColor = meta
       }
-      
-      metaThemeColor.setAttribute('content', themeColor)
-      document.body.style.background = bgGradient
-      document.documentElement.style.setProperty('--status-bar-gradient', bgGradient)
-      
-      return () => {
-        try {
-          if (metaThemeColor) {
-            metaThemeColor.setAttribute('content', '#FED7AA')
-          }
-          document.body.style.background = 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)'
-          document.documentElement.style.setProperty('--status-bar-gradient', 'linear-gradient(135deg, #FED7AA 0%, #FEF3C7 100%)')
-        } catch (error) {
-          console.error('Error resetting theme:', error)
-        }
-      }
+      // 常に白に固定
+      metaThemeColor.setAttribute('content', '#FFFFFF')
+      document.body.style.background = '#FFFFFF'
+      document.documentElement.style.setProperty('--status-bar-gradient', '#FFFFFF')
     } catch (error) {
       console.error('Error setting theme:', error)
     }
@@ -170,7 +153,8 @@ export default function CreateChallengePage() {
           
           // 住所を非同期で取得して更新（最新の緯度経度で上書き）
           const { latitude, longitude } = position.coords
-          getAddressFromCoordsWithOptions(latitude, longitude, { noCache: true })
+          // 初回はキャッシュを利用（noCache:false）してAPI呼び出しを削減
+          getAddressFromCoordsWithOptions(latitude, longitude, { noCache: false })
             .then(address => {
               setChallengeData(prev => ({
                 ...prev,
@@ -250,7 +234,8 @@ export default function CreateChallengePage() {
         }))
 
         // 新しい座標に対して住所を再取得して上書き
-        getAddressFromCoordsWithOptions(newLat, newLng, { noCache: true })
+        // 高精度更新時もキャッシュを優先
+        getAddressFromCoordsWithOptions(newLat, newLng, { noCache: false })
           .then(address => {
             setChallengeData(prev => ({
               ...prev,
@@ -462,7 +447,7 @@ export default function CreateChallengePage() {
 
       const startLocation = await getLocation()
       // 現在地の住所を同期的に解決（DBに正しい住所を保存するため）
-      const startAddress = await getAddressFromCoordsWithOptions(startLocation.lat, startLocation.lng, { noCache: true })
+      const startAddress = await getAddressFromCoordsWithOptions(startLocation.lat, startLocation.lng, { noCache: false })
       console.log('📍 Start location:', startLocation)
 
       // Create challenge in database
@@ -569,14 +554,13 @@ export default function CreateChallengePage() {
   }
 
   return (
-    <div className="full-screen-safe overflow-hidden bg-gray-50 relative" style={{ zIndex: 1001 }}>
+    <div className="full-screen-safe overflow-hidden bg-white relative z-[1001]">
       {/* Back Button */}
-      <div className="absolute top-4 left-4" style={{ zIndex: 1 }}>
+      <div className="absolute top-4 left-4 z-[1]">
         <button
           aria-label="戻る"
           onClick={() => router.back()}
-          className="flex items-center justify-center bg-white rounded-full shadow-lg"
-          style={{ height: '48px', width: '48px' }}
+          className="flex items-center justify-center bg-white rounded-full shadow-lg h-12 w-12"
           tabIndex={0}
           type="button"
         >
@@ -596,7 +580,7 @@ export default function CreateChallengePage() {
       {/* Background Map */}
       <div className="absolute inset-0 z-0">
         {/* Cleaned up old Leaflet CSS remnants */}
-        <div id="setting-location-map">
+        <div id="setting-location-map" className="h-screen">
           <ErrorBoundary 
             fallback={
               <div className="loading-container h-full flex items-center justify-center">
@@ -607,7 +591,7 @@ export default function CreateChallengePage() {
             <MapPicker
               locations={{ wakeUp: challengeData.wakeUpLocation }}
               onLocationSelect={(locationType, location) => handleLocationSelect(location)}
-              height="100vh"
+              height="100%"
               className="w-full"
             />
           </ErrorBoundary>
@@ -620,20 +604,9 @@ export default function CreateChallengePage() {
           {/* Settings Cards Container */}
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-4">
             
-            {/* 起床場所 */}
-            <button 
-              className="w-full flex items-center h-12 px-4 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-50"
-              onClick={() => {
-                const params = new URLSearchParams()
-                if (challengeData.wakeUpLocation) {
-                  params.set('wakeUpLat', challengeData.wakeUpLocation.lat.toString())
-                  params.set('wakeUpLng', challengeData.wakeUpLocation.lng.toString())
-                  if (challengeData.wakeUpLocation.address) {
-                    params.set('wakeUpAddress', challengeData.wakeUpLocation.address)
-                  }
-                }
-                router.push(`/create-challenge/location?${params.toString()}`)
-              }}
+            {/* 起床場所（単一画面で設定するため別ページ遷移は廃止） */}
+            <div 
+              className="w-full flex items-center h-12 px-4 border-b border-gray-100"
             >
               <div className="w-16 text-xs text-gray-500 tracking-wide">起床場所</div>
               <div className="flex-1 text-sm text-left">
@@ -641,12 +614,7 @@ export default function CreateChallengePage() {
                   {challengeData.wakeUpLocation?.address ? formatAddress(challengeData.wakeUpLocation.address) : '現在地を取得中...'}
                 </span>
               </div>
-              <div className="px-3">
-                <svg width="8" height="10" viewBox="0 0 8 10" className="text-gray-400">
-                  <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M1 2l3 3-3 3"/>
-                </svg>
-              </div>
-            </button>
+            </div>
 
             {/* 目覚時間 */}
             <button 

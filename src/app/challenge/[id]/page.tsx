@@ -12,7 +12,7 @@ import { formatAddress } from '@/lib/addressFormatter'
 const MapPicker = dynamic(() => import('@/components/MapPicker'), {
   ssr: false,
   loading: () => (
-    <div className="loading-container" style={{ height: '612px' }}>
+    <div className="loading-container h-[612px]">
       <div>地図を読み込み中...</div>
     </div>
   )
@@ -167,7 +167,7 @@ export default function ChallengePage() {
       <div className="relative bg-white">
         <ErrorBoundary 
           fallback={
-            <div className="loading-container" style={{ height: '612px' }}>
+            <div className="loading-container h-[612px]">
               <div>地図の読み込みに失敗しました</div>
             </div>
           }
