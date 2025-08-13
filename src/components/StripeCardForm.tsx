@@ -66,15 +66,15 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
         return
       }
 
-      // バックエンドにPaymentMethodを保存
-      const response = await fetch('/api/payment-methods', {
+      // バックエンドにPaymentMethodを保存（統一ルート）
+      const response = await fetch('/api/payment/methods', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          payment_method_id: paymentMethod.id,
-          cardholder_name: cardholderName,
+          paymentMethodId: paymentMethod.id,
+          setAsDefault: true,
         }),
       })
 
@@ -83,8 +83,8 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
         throw new Error(errorData.error || 'カード登録に失敗しました')
       }
 
-      const result = await response.json()
-      onSuccess?.(result.paymentMethod)
+      // サーバー登録成功。クライアント側では作成済みのpaymentMethodで通知
+      onSuccess?.(paymentMethod)
 
     } catch (error: any) {
       console.error('Card registration error:', error)
