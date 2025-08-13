@@ -120,8 +120,14 @@ export default function RootLayout({
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="theme-color" content="#FFFFFF" />
+        {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? null : (
+          <script dangerouslySetInnerHTML={{__html: "console.warn('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is not set');"}} />
+        )}
+        {process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ? null : (
+          <script dangerouslySetInnerHTML={{__html: "console.warn('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set');"}} />
+        )}
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <link rel="preload" as="image" href="/marker-target.svg" />
+        {/* preload for marker removed to avoid console warnings on non-map pages */}
       </head>
       <body className={`${inter.className} antialiased min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
         <ErrorBoundary>

@@ -608,8 +608,8 @@ export default function CreateChallengePage() {
             <div 
               className="w-full flex items-center h-12 px-4 border-b border-gray-100"
             >
-              <div className="w-16 text-xs text-gray-500 tracking-wide">起床場所</div>
-              <div className="flex-1 text-sm text-left">
+              <div className="w-16 text-xs text-gray-500 tracking-wide text-right">起床場所</div>
+              <div className="flex-1 text-sm text-left ml-3">
                 <span className={challengeData.wakeUpLocation?.address && !challengeData.wakeUpLocation.address.includes('取得中') ? 'text-gray-800' : 'text-gray-400'}>
                   {challengeData.wakeUpLocation?.address ? formatAddress(challengeData.wakeUpLocation.address) : '現在地を取得中...'}
                 </span>
@@ -623,8 +623,8 @@ export default function CreateChallengePage() {
                 router.push(`/create-challenge/time?current=${encodeURIComponent(challengeData.wakeTime)}`)
               }}
             >
-              <div className="w-16 text-xs text-gray-500 tracking-wide">目覚時間</div>
-              <div className="flex-1 text-sm text-gray-800 text-left">
+              <div className="w-16 text-xs text-gray-500 tracking-wide text-right">目覚時間</div>
+              <div className="flex-1 text-sm text-gray-800 text-left ml-3">
                 {formatDate(challengeData.wakeTime)}
               </div>
               <div className="px-3">
@@ -641,8 +641,8 @@ export default function CreateChallengePage() {
                 router.push(`/create-challenge/penalty?current=${challengeData.penaltyAmount}`)
               }}
             >
-              <div className="w-16 text-xs text-gray-500 tracking-wide">覚悟金額</div>
-              <div className="flex-1 text-sm text-gray-800 text-left">
+              <div className="w-16 text-xs text-gray-500 tracking-wide text-right">覚悟金額</div>
+              <div className="flex-1 text-sm text-gray-800 text-left ml-3">
                 ￥{challengeData.penaltyAmount.toLocaleString()}
               </div>
               <div className="px-3">
@@ -659,8 +659,8 @@ export default function CreateChallengePage() {
                 router.push('/settings/payment')
               }}
             >
-              <div className="w-16 text-xs text-gray-500 tracking-wide">支払方法</div>
-              <div className="flex-1 flex items-center text-sm text-gray-800">
+              <div className="w-16 text-xs text-gray-500 tracking-wide text-right">支払方法</div>
+              <div className="flex-1 flex items-center text-sm text-gray-800 ml-3">
                 {loadingPayment ? (
                   <div className="text-gray-400">読み込み中...</div>
                 ) : (

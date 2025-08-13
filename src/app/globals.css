@@ -235,6 +235,18 @@
     user-select: text;
     -webkit-user-select: text;
   }
+
+  /* Allow interaction and text selection inside Stripe iframes on iOS */
+  iframe[name^="__privateStripeFrame"],
+  .StripeElement,
+  .StripeElement > div,
+  .InputElement,
+  .PaymentElement {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    pointer-events: auto !important;
+    touch-action: manipulation;
+  }
   
   /* Prevent horizontal scroll */
   * {

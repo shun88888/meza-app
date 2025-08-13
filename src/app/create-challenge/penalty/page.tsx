@@ -36,34 +36,30 @@ export default function PenaltySettingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-b border-gray-100 px-4 py-6">
+        <div className="grid grid-cols-3 items-center">
           <div className="flex items-center">
             <button
               onClick={() => router.back()}
-              className="p-2 -ml-2 text-gray-600 hover:text-gray-800"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="戻る"
+              title="戻る"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="m15 18-6-6 6-6"/>
               </svg>
             </button>
-            <h1 className="ml-2 text-lg font-semibold text-gray-800">覚悟金額設定</h1>
           </div>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
-          >
-            決定
-          </button>
+          <h1 className="text-center text-lg font-medium text-gray-900">覚悟金額設定</h1>
+          <div />
         </div>
       </div>
 
       <div className="p-4">
         {/* 説明テキスト */}
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
@@ -71,10 +67,10 @@ export default function PenaltySettingPage() {
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-orange-800">
+              <h3 className="text-sm font-medium text-gray-900">
                 覚悟金額について
               </h3>
-              <div className="mt-2 text-sm text-orange-700">
+              <div className="mt-2 text-sm text-gray-700">
                 <p>設定した時間に起きられなかった場合に支払う金額です。高い金額を設定するほど、起きる動機が強くなります。</p>
               </div>
             </div>
@@ -83,8 +79,14 @@ export default function PenaltySettingPage() {
 
         {/* 定額選択 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-base font-medium text-gray-900">推奨金額</h2>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-[#FFAD2F] text-white rounded-lg text-sm font-medium hover:bg-[#FF9A1F] transition-colors"
+            >
+              決定
+            </button>
           </div>
           <div className="grid grid-cols-2 gap-3 p-4">
             {predefinedAmounts.map((amount) => (
@@ -96,7 +98,7 @@ export default function PenaltySettingPage() {
                 }}
                 className={`p-4 rounded-lg border-2 transition-all duration-200 ${
                   selectedAmount === amount && !showCustomInput
-                    ? 'border-orange-500 bg-orange-50 text-orange-700'
+                    ? 'border-gray-900 bg-gray-50 text-gray-900'
                     : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -123,7 +125,7 @@ export default function PenaltySettingPage() {
               onClick={() => setShowCustomInput(!showCustomInput)}
               className={`w-full p-4 rounded-lg border-2 transition-all duration-200 ${
                 showCustomInput
-                  ? 'border-orange-500 bg-orange-50'
+                  ? 'border-gray-900 bg-gray-50'
                   : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
@@ -144,7 +146,7 @@ export default function PenaltySettingPage() {
                     value={customAmount}
                     onChange={(e) => handleCustomAmountChange(e.target.value)}
                     placeholder="金額を入力"
-                    className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-lg"
+                    className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 text-lg"
                     inputMode="numeric"
                   />
                 </div>

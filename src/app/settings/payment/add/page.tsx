@@ -53,7 +53,7 @@ export default function AddPaymentMethodPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <div className="max-w-md mx-auto bg-white min-h-screen">
         {/* Header */}
         <div className="px-4 py-6 border-b border-gray-100">
@@ -61,6 +61,8 @@ export default function AddPaymentMethodPage() {
             <button 
               onClick={handleBack}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="戻る"
+              title="戻る"
             >
               <ArrowDownLeft size={20} className="text-gray-600 rotate-45" />
             </button>

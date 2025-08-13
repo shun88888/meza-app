@@ -64,27 +64,20 @@ export default function TimeSettingPage() {
     }
   }
 
-  // 今日から7日後までの日付オプションを生成
-  const getDateOptions = () => {
-    const options = []
-    const today = new Date()
-    
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today)
-      date.setDate(today.getDate() + i)
-      options.push({
-        value: date.toISOString().split('T')[0],
-        label: i === 0 ? '今日' : i === 1 ? '明日' : date.toLocaleDateString('ja-JP', {
-          month: 'numeric',
-          day: 'numeric',
-          weekday: 'short'
-        }),
-        date: date
-      })
+  // 日付モード（今日/明日/日付指定）
+  const [dateMode, setDateMode] = useState<'today' | 'tomorrow' | 'custom'>(() => {
+    const todayStr = new Date().toISOString().split('T')[0]
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]
+    if (currentTime) {
+      const cur = new Date(currentTime).toISOString().split('T')[0]
+      if (cur === todayStr) return 'today'
+      if (cur === tomorrowStr) return 'tomorrow'
+      return 'custom'
     }
-    
-    return options
-  }
+    return 'tomorrow'
+  })
 
   const quickTimeOptions = [
     { hours: 6, minutes: 0, label: '早朝' },
@@ -95,60 +88,87 @@ export default function TimeSettingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-b border-gray-100 px-4 py-6">
+        <div className="grid grid-cols-3 items-center">
           <div className="flex items-center">
             <button
               onClick={() => router.back()}
-              className="p-2 -ml-2 text-gray-600 hover:text-gray-800"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="戻る"
+              title="戻る"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="m15 18-6-6 6-6"/>
               </svg>
             </button>
-            <h1 className="ml-2 text-lg font-semibold text-gray-800">目覚時間設定</h1>
           </div>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
-          >
-            決定
-          </button>
+          <h1 className="text-center text-lg font-medium text-gray-900">目覚時間設定</h1>
+          <div />
         </div>
       </div>
 
       <div className="p-4">
         {/* 日付選択 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-base font-medium text-gray-900">日付選択</h2>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-[#FFAD2F] text-white rounded-lg text-sm font-medium hover:bg-[#FF9A1F] transition-colors"
+            >
+              決定
+            </button>
           </div>
-          <div className="p-4">
-            <div className="grid grid-cols-1 gap-2">
-              {getDateOptions().map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setSelectedDate(option.value)}
-                  className={`p-3 rounded-lg border-2 transition-all duration-200 text-left ${
-                    selectedDate === option.value
-                      ? 'border-orange-500 bg-orange-50 text-orange-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-medium">{option.label}</div>
-                  <div className="text-sm text-gray-500">
-                    {option.date.toLocaleDateString('ja-JP', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-                </button>
-              ))}
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => {
+                  const today = new Date()
+                  setSelectedDate(today.toISOString().split('T')[0])
+                  setDateMode('today')
+                }}
+                className={`p-3 rounded-lg border-2 transition-all duration-200 ${
+                  dateMode === 'today' ? 'border-gray-900 bg-gray-50 text-gray-900' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium">今日</div>
+              </button>
+              <button
+                onClick={() => {
+                  const t = new Date(); const tm = new Date(t); tm.setDate(t.getDate() + 1)
+                  setSelectedDate(tm.toISOString().split('T')[0])
+                  setDateMode('tomorrow')
+                }}
+                className={`p-3 rounded-lg border-2 transition-all duration-200 ${
+                  dateMode === 'tomorrow' ? 'border-gray-900 bg-gray-50 text-gray-900' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium">明日</div>
+              </button>
+              <button
+                onClick={() => setDateMode('custom')}
+                className={`p-3 rounded-lg border-2 transition-all duration-200 ${
+                  dateMode === 'custom' ? 'border-gray-900 bg-gray-50 text-gray-900' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium">日付指定</div>
+              </button>
             </div>
+            {dateMode === 'custom' && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="custom-date" className="text-sm text-gray-700">日付を選択</label>
+                <input
+                  id="custom-date"
+                  aria-label="日付を選択"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -164,7 +184,7 @@ export default function TimeSettingPage() {
                 onClick={() => handleTimeChange(option.hours, option.minutes)}
                 className={`p-3 rounded-lg border-2 transition-all duration-200 ${
                   selectedTime.hours === option.hours && selectedTime.minutes === option.minutes
-                    ? 'border-orange-500 bg-orange-50 text-orange-700'
+                    ? 'border-gray-900 bg-gray-50 text-gray-900'
                     : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -193,6 +213,8 @@ export default function TimeSettingPage() {
                   <button
                     onClick={() => handleTimeChange((selectedTime.hours + 1) % 24, selectedTime.minutes)}
                     className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                    aria-label="時間を1時間増やす"
+                    title="時間を増やす"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="m18 15-6-6-6 6"/>
@@ -204,6 +226,8 @@ export default function TimeSettingPage() {
                   <button
                     onClick={() => handleTimeChange((selectedTime.hours - 1 + 24) % 24, selectedTime.minutes)}
                     className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                    aria-label="時間を1時間減らす"
+                    title="時間を減らす"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="m6 9 6 6 6-6"/>
@@ -221,6 +245,8 @@ export default function TimeSettingPage() {
                   <button
                     onClick={() => handleTimeChange(selectedTime.hours, (selectedTime.minutes + 5) % 60)}
                     className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                    aria-label="分を5分増やす"
+                    title="分を増やす"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="m18 15-6-6-6 6"/>
@@ -232,6 +258,8 @@ export default function TimeSettingPage() {
                   <button
                     onClick={() => handleTimeChange(selectedTime.hours, (selectedTime.minutes - 5 + 60) % 60)}
                     className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                    aria-label="分を5分減らす"
+                    title="分を減らす"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="m6 9 6 6 6-6"/>

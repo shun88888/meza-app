@@ -3,7 +3,12 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { SUPABASE_CONFIG, isSupabaseConfigured } from './supabase-config'
 
-// Global singleton instance
+// Global singleton instance (survive HMR)
+declare global {
+  // eslint-disable-next-line no-var
+  var __supabaseClient: ReturnType<typeof createClientComponentClient<Database>> | null | undefined
+}
+
 let globalSupabaseInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
 
 // Initialize singleton only once
@@ -18,17 +23,11 @@ const initSupabaseClient = () => {
     return createClientComponentClient<Database>()
   }
 
-  // Client-side: use global singleton
-  if (!globalSupabaseInstance) {
-    globalSupabaseInstance = createClientComponentClient<Database>()
-    
-    // Add cleanup on page unload to prevent memory leaks
-    if (typeof window !== 'undefined') {
-      window.addEventListener('beforeunload', () => {
-        globalSupabaseInstance = null
-      })
-    }
+  // Client-side: use global singleton that persists across HMR
+  if (!globalThis.__supabaseClient) {
+    globalThis.__supabaseClient = createClientComponentClient<Database>()
   }
+  globalSupabaseInstance = globalThis.__supabaseClient || null
   
   return globalSupabaseInstance
 }

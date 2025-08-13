@@ -161,9 +161,9 @@ export default function ChallengeFailedPage() {
           
           <button
             onClick={handleGoHome}
-            className="w-full h-14 text-lg font-semibold bg-blue-500 hover:bg-blue-600 text-white shadow-lg rounded-3xl transition-all duration-200"
+            className="w-full h-14 text-lg font-semibold bg-yellow-400 hover:bg-yellow-500 text-white shadow-lg rounded-3xl transition-all duration-200"
           >
-            新しいチャレンジを作成
+            ホームに戻る
           </button>
           
           <button
