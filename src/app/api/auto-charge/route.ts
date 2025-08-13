@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     try {
       // Create payment intent for auto-charge
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount * 100, // Convert to cents
+        amount: amount, // JPY is a zero-decimal currency; use yen as-is
         currency: 'jpy',
         customer: selectedCustomerId!,
         payment_method: selectedPaymentMethodId!,

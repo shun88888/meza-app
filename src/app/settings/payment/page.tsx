@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { getCurrentUser } from '@/lib/supabase'
-import { getPaymentMethods, PaymentMethodInfo } from '@/lib/stripe'
 import { ArrowDownLeft, CreditCard, Plus, Trash2 } from 'lucide-react'
 
 // Remove custom interface, use the one from stripe lib
@@ -11,7 +11,7 @@ import { ArrowDownLeft, CreditCard, Plus, Trash2 } from 'lucide-react'
 export default function PaymentMethodPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodInfo[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ id: string; brand: string; last4: string; exp_month: number; exp_year: number; isDefault?: boolean }>>([])
   const router = useRouter()
 
   const loadPaymentMethods = async () => {
@@ -20,21 +20,13 @@ export default function PaymentMethodPage() {
       setUser(currentUser)
       
       if (currentUser) {
-        // 新しいAPIエンドポイントを使用
-        try {
-          const response = await fetch('/api/payment-methods')
-          if (response.ok) {
-            const data = await response.json()
-            setPaymentMethods(data.paymentMethods)
-          } else {
-            // フォールバック: 既存のAPIを使用
-            const methods = await getPaymentMethods(currentUser.id)
-            setPaymentMethods(methods.paymentMethods)
-          }
-        } catch {
-          // フォールバック: 既存のAPIを使用
-          const methods = await getPaymentMethods(currentUser.id)
-          setPaymentMethods(methods.paymentMethods)
+        // StripeベースのAPIに統一
+        const response = await fetch('/api/payment/methods')
+        if (response.ok) {
+          const data = await response.json()
+          setPaymentMethods(data.paymentMethods || [])
+        } else {
+          setPaymentMethods([])
         }
       }
     } catch (error) {
@@ -113,7 +105,7 @@ export default function PaymentMethodPage() {
     }
 
     try {
-      const response = await fetch(`/api/payment-methods?id=${id}`, {
+      const response = await fetch(`/api/payment/methods?paymentMethodId=${id}`, {
         method: 'DELETE'
       })
 
@@ -164,8 +156,8 @@ export default function PaymentMethodPage() {
         <div className="p-4 pb-6">
           {/* Add Payment Method */}
           <div className="mb-4">
-            <button 
-              onClick={() => router.push('/settings/payment/add')}
+            <Link 
+              href="/settings/payment/add"
               className="w-full flex items-center justify-center p-4 bg-[#FFF9E6] hover:bg-[#FFE72E]/20 rounded-2xl transition-colors border border-[#FFE72E]/30"
               aria-label="新しいカードを追加"
               title="新しいカードを追加"
@@ -179,7 +171,7 @@ export default function PaymentMethodPage() {
                   <p className="text-xs text-gray-700">クレジットカード・デビットカード</p>
                 </div>
               </div>
-            </button>
+            </Link>
           </div>
 
           {/* Payment Methods */}
@@ -202,16 +194,15 @@ export default function PaymentMethodPage() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900 text-sm">
-                        {getCardName(method.card?.brand || '')} •••• {method.card?.last4}
+                        {getCardName(method.brand || '')} •••• {method.last4}
                         {method.id && (
                           <span className="ml-2 inline-flex items-center text-xs text-gray-500">
-                            {/* best-effort default indicator: first item considered default when API lacks flag */}
-                            {paymentMethods[0]?.id === method.id ? '（デフォルト）' : ''}
+                            {method.isDefault ? '（デフォルト）' : ''}
                           </span>
                         )}
                       </p>
                       <p className="text-xs text-gray-500">
-                        有効期限: {method.card?.exp_month?.toString().padStart(2, '0')}/{method.card?.exp_year}
+                        有効期限: {method.exp_month?.toString().padStart(2, '0')}/{method.exp_year}
                       </p>
                     </div>
                   </div>

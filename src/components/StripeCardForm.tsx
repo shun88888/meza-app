@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import {
   Elements,
-  CardElement,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
   useStripe,
   useElements
 } from '@stripe/react-stripe-js'
@@ -39,9 +41,8 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
     setIsLoading(true)
     setError('')
 
-    const cardElement = elements.getElement(CardElement)
-
-    if (!cardElement) {
+    const cardNumberElement = elements.getElement(CardNumberElement)
+    if (!cardNumberElement) {
       setError('カード情報が入力されていません')
       setIsLoading(false)
       return
@@ -51,7 +52,7 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
       // PaymentMethodを作成
       const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
         type: 'card',
-        card: cardElement,
+        card: cardNumberElement,
         billing_details: {
           name: cardholderName,
         },
@@ -106,14 +107,13 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
         iconColor: '#EF4444',
       },
     },
-    hidePostalCode: true,
   }
 
   return (
     <div className="max-w-md mx-auto">
       <div className="mb-6">
         <div className="flex items-center space-x-3 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-r from-[#FFAD2F] to-[#FFE72E] rounded-full flex items-center justify-center">
+          <div className="w-12 h-12 bg-[#FFF7CC] rounded-full flex items-center justify-center">
             <CreditCard size={24} className="text-white" />
           </div>
           <div>
@@ -143,13 +143,27 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
           />
         </div>
 
-        {/* カード情報 (Stripe Elements) */}
+        {/* カード番号 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            カード情報
-          </label>
-          <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-[#FFAD2F] focus-within:border-transparent">
-            <CardElement options={cardElementOptions} />
+          <label className="block text-sm font-medium text-gray-700 mb-2">カード番号</label>
+          <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-[#FFE680] focus-within:border-transparent">
+            <CardNumberElement options={cardElementOptions as any} />
+          </div>
+        </div>
+
+        {/* 有効期限とCVC */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">有効期限 (MM/YY)</label>
+            <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-[#FFE680] focus-within:border-transparent">
+              <CardExpiryElement options={cardElementOptions as any} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">セキュリティコード</label>
+            <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-[#FFE680] focus-within:border-transparent">
+              <CardCvcElement options={cardElementOptions as any} />
+            </div>
           </div>
         </div>
 
@@ -168,7 +182,7 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
             className={`flex-1 py-3 px-4 rounded-2xl font-medium transition-colors ${
               !stripe || isLoading
                 ? 'bg-gray-400 text-white cursor-not-allowed'
-                : 'bg-gradient-to-r from-[#FFAD2F] to-[#FFE72E] hover:from-[#FF8A00] hover:to-[#FFAD2F] text-gray-900'
+                : 'bg-[#FFCC00] hover:bg-[#FFB800] text-gray-900'
             }`}
           >
             {isLoading ? '登録中...' : 'カードを登録'}

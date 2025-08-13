@@ -111,7 +111,7 @@ serve(async (req) => {
           
           // Create a new payment intent for retry (safer approach)
           updatedPaymentIntent = await stripe.paymentIntents.create({
-            amount: payment.amount * 100, // Convert to cents
+            amount: payment.amount, // JPY is zero-decimal; use yen as-is
             currency: 'jpy',
             customer: paymentIntent.customer as string,
             payment_method: defaultPaymentMethod.stripe_payment_method_id,

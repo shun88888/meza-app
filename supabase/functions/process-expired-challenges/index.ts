@@ -122,7 +122,7 @@ serve(async (req) => {
           console.log(`💳 Processing payment for challenge ${challenge.id}`)
 
           const paymentIntent = await stripe.paymentIntents.create({
-            amount: challenge.penalty_amount * 100, // Convert to cents
+            amount: challenge.penalty_amount, // JPY is zero-decimal; use yen as-is
             currency: 'jpy',
             customer: defaultPaymentMethod.stripe_customer_id,
             payment_method: defaultPaymentMethod.stripe_payment_method_id,
