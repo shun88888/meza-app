@@ -37,7 +37,8 @@ export const createClientSideClient = () => {
 }
 
 // Admin client (for server actions requiring elevated permissions)
-export const supabase = isSupabaseConfigured() 
+const isServerEnvironment = typeof window === 'undefined'
+export const supabase = isServerEnvironment && isSupabaseConfigured()
   ? createClient<Database>(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
       auth: {
         persistSession: false,
