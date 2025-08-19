@@ -139,12 +139,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { paymentMethodId, setAsDefault } = await request.json()
-
-    if (!paymentMethodId) {
-      return NextResponse.json({ error: 'Payment method ID is required' }, { status: 400 })
-    }
-
     // Get user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -160,12 +154,14 @@ export async function POST(request: NextRequest) {
 
     // Create customer if not exists
     if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: profile.email,
-        metadata: {
-          userId: user.id
-        }
-      })
+      const customer = await withRetries(() =>
+        stripe!.customers.create({
+          email: profile.email,
+          metadata: {
+            userId: user.id
+          }
+        })
+      )
       
       customerId = customer.id
 
@@ -176,64 +172,75 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id)
     }
 
-    // Attach payment method to customer if needed
-    const existingPm = await withRetries(() =>
-      stripe!.paymentMethods.retrieve(paymentMethodId)
+    // Create SetupIntent for secure card saving
+    const setupIntent = await withRetries(() =>
+      stripe!.setupIntents.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        usage: 'off_session',
+      })
     )
-    if (existingPm.customer && existingPm.customer !== customerId) {
+
+    return NextResponse.json({ 
+      clientSecret: setupIntent.client_secret
+    })
+
+  } catch (error) {
+    console.error('Error creating setup intent:', error)
+    
+    if (error instanceof Stripe.errors.StripeError) {
       return NextResponse.json({
-        error: 'This payment method is already attached to another customer'
+        error: `Stripe error: ${error.message}`
       }, { status: 400 })
     }
 
-    if (!existingPm.customer) {
-      const idemKey = `attach_${paymentMethodId}_${user.id}`
-      await withRetries(() =>
-        stripe!.paymentMethods.attach(
-          paymentMethodId,
-          { customer: customerId },
-          { idempotencyKey: idemKey }
-        )
-      )
-    }
-
-    // Ensure local record exists (upsert minimal fields)
-    const attachedPm = await withRetries(() =>
-      stripe!.paymentMethods.retrieve(paymentMethodId)
+    return NextResponse.json(
+      { error: 'Failed to create setup intent' },
+      { status: 500 }
     )
-    if (attachedPm && attachedPm.type === 'card' && attachedPm.card) {
-      const { data: existing } = await supabase
-        .from('payment_methods')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('stripe_payment_method_id', paymentMethodId)
-        .maybeSingle()
+  }
+}
 
-      if (!existing) {
-        await supabase
-          .from('payment_methods')
-          .insert({
-            user_id: user.id,
-            last4: attachedPm.card.last4,
-            brand: attachedPm.card.brand,
-            exp_month: attachedPm.card.exp_month,
-            exp_year: attachedPm.card.exp_year,
-            cardholder_name: undefined,
-            is_default: false,
-            stripe_customer_id: customerId,
-            stripe_payment_method_id: attachedPm.id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-      }
+export async function PATCH(request: NextRequest) {
+  // Check if Stripe is configured
+  if (!stripe) {
+    return NextResponse.json(
+      { error: 'Payment service is not configured' },
+      { status: 503 }
+    )
+  }
+
+  try {
+    const supabase = createServerSideClient()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Set as default if requested
+    const { paymentMethodId, setAsDefault } = await request.json()
+
+    if (!paymentMethodId) {
+      return NextResponse.json({ error: 'Payment method ID is required' }, { status: 400 })
+    }
+
+    // Get user's customer ID
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.stripe_customer_id) {
+      return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
+    }
+
     if (setAsDefault) {
+      // Update default payment method in Stripe
       const idemKey = `set_default_${paymentMethodId}_${user.id}`
       await withRetries(() =>
         stripe!.customers.update(
-          customerId,
+          profile.stripe_customer_id,
           {
             invoice_settings: {
               default_payment_method: paymentMethodId,
@@ -243,7 +250,7 @@ export async function POST(request: NextRequest) {
         )
       )
 
-      // Supabase側のデフォルトフラグも同期
+      // Sync Supabase flags
       await supabase
         .from('payment_methods')
         .update({ is_default: false, updated_at: new Date().toISOString() })
@@ -258,11 +265,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true,
-      message: 'Payment method added successfully'
+      message: 'Payment method updated successfully'
     })
 
   } catch (error) {
-    console.error('Error adding payment method:', error)
+    console.error('Error updating payment method:', error)
     
     if (error instanceof Stripe.errors.StripeError) {
       return NextResponse.json({
@@ -271,7 +278,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to add payment method' },
+      { error: 'Failed to update payment method' },
       { status: 500 }
     )
   }

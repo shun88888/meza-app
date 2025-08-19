@@ -53,81 +53,59 @@ function CardRegistrationForm({
     setProcessingStep('カード情報を検証しています...')
 
     try {
-      // Create payment method
-      const { paymentMethod, error: pmError }: PaymentMethodResult = await stripe.createPaymentMethod({
-        type: 'card',
-        card,
-      })
+      setProcessingStep('セットアップ処理を開始しています...')
 
-      if (pmError) {
-        setError(pmError.message || 'カード情報の検証に失敗しました')
-        setIsLoading(false)
-        setProcessingStep('')
-        return
-      }
-
-      if (!paymentMethod) {
-        setError('カード情報の作成に失敗しました')
-        setIsLoading(false)
-        setProcessingStep('')
-        return
-      }
-
-      setProcessingStep('ユーザープロファイルを確認しています...')
-
-      // Setup payment method
-      console.log('Setting up payment method for user:', userId)
-      const response = await fetch('/api/payment-methods', {
+      // Get SetupIntent client secret from backend
+      const setupResponse = await fetch('/api/payment/methods', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          payment_method_id: paymentMethod.id,
-          cardholder_name: undefined,
-        }),
+        body: JSON.stringify({}),
       })
 
-      const result = await response.json()
-
-      if (!response.ok) {
-        console.error('Payment method setup failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          result
-        })
-        
-        // Handle authentication errors
-        if (response.status === 401) {
-          setError('認証エラーが発生しました。ログインし直してください。')
-          setIsLoading(false)
-          setProcessingStep('')
-          return
-        }
-
-        // Handle permission errors
-        if (response.status === 403) {
-          setError('アクセス権限がありません。')
-          setIsLoading(false)
-          setProcessingStep('')
-          return
-        }
-
-        // Show more detailed error information
-        const errorMessage = result.error || 'カード登録に失敗しました'
-        const details = result.details ? ` (詳細: ${result.details})` : ''
-        throw new Error(errorMessage + details)
+      if (!setupResponse.ok) {
+        const errorData = await setupResponse.json()
+        throw new Error(errorData.error || 'セットアップ処理に失敗しました')
       }
 
-      // Success
+      const { clientSecret } = await setupResponse.json()
+
+      setProcessingStep('カード情報を安全に登録しています...')
+
+      // Use confirmSetup to securely attach payment method to customer
+      const { error: confirmError, setupIntent } = await stripe.confirmSetup({
+        elements,
+        clientSecret,
+        confirmParams: {
+          payment_method_data: {
+            billing_details: {
+              name: `User ${userId}`,
+            },
+          },
+        },
+        redirect: 'if_required',
+      })
+
+      if (confirmError) {
+        setError(confirmError.message || 'カード認証に失敗しました')
+        setIsLoading(false)
+        setProcessingStep('')
+        return
+      }
+
+      // Success - payment method is now attached to customer via SetupIntent
       setProcessingStep('カード登録が完了しました!')
-      const newPaymentMethod: PaymentMethodInfo = {
-        id: result.paymentMethod.id,
-        type: result.paymentMethod.type,
-        card: result.paymentMethod.card
-      }
+      
+      if (setupIntent.payment_method) {
+        const newPaymentMethod: PaymentMethodInfo = {
+          id: (setupIntent.payment_method as any).id,
+          type: (setupIntent.payment_method as any).type,
+          card: (setupIntent.payment_method as any).card
+        }
 
-      onSuccess?.(newPaymentMethod)
+        onSuccess?.(newPaymentMethod)
+      }
 
     } catch (error) {
       console.error('Card registration error:', error)

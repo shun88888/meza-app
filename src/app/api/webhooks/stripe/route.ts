@@ -200,6 +200,93 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      case 'setup_intent.succeeded': {
+        const setupIntent = event.data.object as Stripe.SetupIntent
+        console.log('✅ Setup intent succeeded:', setupIntent.id)
+
+        if (setupIntent.payment_method && setupIntent.customer && typeof setupIntent.customer === 'string') {
+          try {
+            // Get payment method details
+            const paymentMethod = await stripe!.paymentMethods.retrieve(setupIntent.payment_method as string)
+            
+            if (paymentMethod.type === 'card' && paymentMethod.card) {
+              // Find user by customer ID
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('stripe_customer_id', setupIntent.customer)
+                .single()
+
+              if (profile) {
+                // Check if this is the first/only payment method - if so, make it default
+                const existingMethods = await stripe!.paymentMethods.list({
+                  customer: setupIntent.customer,
+                  type: 'card',
+                })
+                const isFirstMethod = existingMethods.data.length <= 1
+
+                if (isFirstMethod) {
+                  await stripe!.customers.update(setupIntent.customer, {
+                    invoice_settings: {
+                      default_payment_method: paymentMethod.id,
+                    },
+                  })
+                }
+
+                // Sync to Supabase (upsert)
+                const { data: existing } = await supabase
+                  .from('payment_methods')
+                  .select('id')
+                  .eq('user_id', profile.id)
+                  .eq('stripe_payment_method_id', paymentMethod.id)
+                  .maybeSingle()
+
+                if (existing) {
+                  await supabase
+                    .from('payment_methods')
+                    .update({
+                      last4: paymentMethod.card.last4,
+                      brand: paymentMethod.card.brand,
+                      exp_month: paymentMethod.card.exp_month,
+                      exp_year: paymentMethod.card.exp_year,
+                      is_default: isFirstMethod,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', existing.id)
+                } else {
+                  // Clear other defaults if this is the new default
+                  if (isFirstMethod) {
+                    await supabase
+                      .from('payment_methods')
+                      .update({ is_default: false, updated_at: new Date().toISOString() })
+                      .eq('user_id', profile.id)
+                  }
+
+                  await supabase
+                    .from('payment_methods')
+                    .insert({
+                      user_id: profile.id,
+                      last4: paymentMethod.card.last4,
+                      brand: paymentMethod.card.brand,
+                      exp_month: paymentMethod.card.exp_month,
+                      exp_year: paymentMethod.card.exp_year,
+                      is_default: isFirstMethod,
+                      stripe_customer_id: setupIntent.customer,
+                      stripe_payment_method_id: paymentMethod.id,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    })
+                }
+              }
+            }
+          } catch (syncError) {
+            console.error('Failed to sync payment method:', syncError)
+          }
+        }
+
+        break
+      }
+
       case 'customer.created': {
         const customer = event.data.object as Stripe.Customer
         console.log('Customer created:', customer.id)

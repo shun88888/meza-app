@@ -51,40 +51,44 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
     }
 
     try {
-      // PaymentMethodを作成
-      const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardNumberElement,
-        billing_details: {
-          name: cardholderName,
-        },
-      })
-
-      if (stripeError) {
-        setError(stripeError.message || 'カード情報の処理に失敗しました')
-        setIsLoading(false)
-        return
-      }
-
-      // バックエンドにPaymentMethodを保存（統一ルート）
-      const response = await fetch('/api/payment/methods', {
+      // Get SetupIntent client secret from backend
+      const setupResponse = await fetch('/api/payment/methods', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          paymentMethodId: paymentMethod.id,
-          setAsDefault: true,
-        }),
+        body: JSON.stringify({}),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'カード登録に失敗しました')
+      if (!setupResponse.ok) {
+        const errorData = await setupResponse.json()
+        throw new Error(errorData.error || 'セットアップ処理に失敗しました')
       }
 
-      // サーバー登録成功。クライアント側では作成済みのpaymentMethodで通知
-      onSuccess?.(paymentMethod)
+      const { clientSecret } = await setupResponse.json()
+
+      // Use confirmSetup to securely attach payment method to customer
+      const { error: confirmError, setupIntent } = await stripe.confirmSetup({
+        elements,
+        clientSecret,
+        confirmParams: {
+          payment_method_data: {
+            billing_details: {
+              name: cardholderName,
+            },
+          },
+        },
+        redirect: 'if_required',
+      })
+
+      if (confirmError) {
+        setError(confirmError.message || 'カード認証に失敗しました')
+        setIsLoading(false)
+        return
+      }
+
+      // Success - payment method is now attached to customer via SetupIntent
+      onSuccess?.(setupIntent.payment_method)
 
     } catch (error: any) {
       console.error('Card registration error:', error)
