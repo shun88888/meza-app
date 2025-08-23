@@ -218,7 +218,7 @@
   /* ステータスバー領域まで背景を拡張（常に白） */
   body::before {
     content: '';
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     right: 0;
@@ -305,6 +305,8 @@
   height: 100vh !important;
   height: 100dvh !important;
   z-index: 1000 !important;
+  /* Suppress scroll restoration warning */
+  scroll-behavior: auto !important;
 }
 
 /* 各ページ固有の背景グラデーション */

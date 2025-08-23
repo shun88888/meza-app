@@ -129,7 +129,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         {/* preload for marker removed to avoid console warnings on non-map pages */}
       </head>
-      <body className={`${inter.className} antialiased min-h-screen-mobile touch-manipulation overflow-x-hidden`}>
+      <body className={`${inter.className} antialiased min-h-screen-mobile touch-manipulation overflow-x-hidden`} style={{scrollBehavior: 'auto'}}>
         <ErrorBoundary>
           <GlobalErrorHandler>
             <DatabaseSetup />

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 // Define protected routes that require authentication
 const protectedRoutes = [
@@ -32,6 +34,7 @@ const publicRoutes = [
   '/login',
   // Allow challenge failure page regardless of auth/session state
   '/challenge-failed',
+  '/not-found',
 ]
 
 // Define blocked routes (deprecated or admin routes)
@@ -69,9 +72,23 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Get authentication status from cookies/headers
-  const supabaseToken = request.cookies.get('sb-access-token')
-  const isAuthenticated = !!supabaseToken
+  // Get authentication status using proper Supabase middleware client
+  let isAuthenticated = false
+  let currentUser = null
+  
+  try {
+    const response = NextResponse.next()
+    const supabase = createMiddlewareClient({ req: request, res: response })
+    const { data: { user }, error } = await supabase.auth.getUser()
+    
+    if (!error && user) {
+      isAuthenticated = true
+      currentUser = user
+    }
+  } catch (error) {
+    // Auth check failed, treat as unauthenticated
+    isAuthenticated = false
+  }
 
   // Check if the route is protected
   const isProtectedRoute = protectedRoutes.some(route => {
@@ -89,6 +106,19 @@ export async function middleware(request: NextRequest) {
     url.pathname = '/auth/signin'
     url.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(url)
+  }
+
+  // アクティブチャレンジの強制誘導チェック（認証済みユーザーのみ）
+  if (isAuthenticated && isProtectedRoute && currentUser) {
+    try {
+      const response = await checkActiveChallenge(request, pathname, currentUser.id)
+      if (response) {
+        return response
+      }
+    } catch (error) {
+      // アクティブチャレンジチェックでエラーが発生してもページアクセスは継続
+      console.warn('Active challenge check failed:', error)
+    }
   }
 
   // Redirect authenticated users from auth pages to home
@@ -141,6 +171,68 @@ export async function middleware(request: NextRequest) {
   response.headers.set('Content-Security-Policy', csp)
   
   return response
+}
+
+// アクティブチャレンジチェック関数
+async function checkActiveChallenge(request: NextRequest, pathname: string, userId: string): Promise<NextResponse | null> {
+  // チャレンジ関連ページは除外（無限リダイレクト防止）
+  const challengePages = [
+    '/active-challenge',
+    '/challenge/',
+    '/challenge-failed',
+    '/settings',
+    '/api'
+  ]
+  
+  const isChallengePage = challengePages.some(page => pathname.startsWith(page))
+  if (isChallengePage) {
+    return null
+  }
+
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return null
+    }
+
+    // Service Roleクライアントでアクティブチャレンジをチェック
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // アクティブチャレンジの有無をチェック
+    const { data: activeChallenge, error } = await supabase
+      .from('challenges')
+      .select('id, ends_at')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single()
+
+    if (error && error.code !== 'PGRST116') {
+      // データベースエラー（not foundは正常）
+      return null
+    }
+
+    if (activeChallenge) {
+      // アクティブチャレンジが存在する場合
+      const now = new Date()
+      const endsAt = new Date(activeChallenge.ends_at)
+      
+      if (now <= endsAt) {
+        // まだ時間内の場合、チャレンジページに誘導
+        const url = request.nextUrl.clone()
+        url.pathname = `/challenge/${activeChallenge.id}`
+        url.searchParams.set('from', pathname)
+        return NextResponse.redirect(url)
+      }
+      // 時間切れの場合はEdge Functionに処理を任せる
+    }
+
+    return null
+  } catch (error) {
+    console.warn('Active challenge middleware error:', error)
+    return null
+  }
 }
 
 export const config = {

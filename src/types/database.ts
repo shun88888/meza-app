@@ -16,6 +16,7 @@ export interface Database {
           created_at: string
           updated_at: string
           stripe_customer_id: string | null
+          default_payment_method: string | null
         }
         Insert: {
           id: string
@@ -23,6 +24,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           stripe_customer_id?: string | null
+          default_payment_method?: string | null
         }
         Update: {
           id?: string
@@ -30,6 +32,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           stripe_customer_id?: string | null
+          default_payment_method?: string | null
         }
       }
       challenges: {
@@ -44,9 +47,11 @@ export interface Database {
           target_latitude: number
           target_longitude: number
           target_address: string
-          status: 'pending' | 'active' | 'completed' | 'failed'
+          status: 'pending' | 'created' | 'active' | 'completed' | 'succeeded' | 'failed' | 'failed_timeout' | 'failed_payment'
           started_at: string | null
           completed_at: string | null
+          ends_at: string | null
+          evidence_ref: string | null
           payment_intent_id: string | null
           completion_lat: number | null
           completion_lng: number | null
@@ -73,9 +78,11 @@ export interface Database {
           target_latitude: number
           target_longitude: number
           target_address: string
-          status?: 'pending' | 'active' | 'completed' | 'failed'
+          status?: 'pending' | 'created' | 'active' | 'completed' | 'succeeded' | 'failed' | 'failed_timeout' | 'failed_payment'
           started_at?: string | null
           completed_at?: string | null
+          ends_at?: string | null
+          evidence_ref?: string | null
           payment_intent_id?: string | null
           completion_lat?: number | null
           completion_lng?: number | null
@@ -102,9 +109,11 @@ export interface Database {
           target_latitude?: number
           target_longitude?: number
           target_address?: string
-          status?: 'pending' | 'active' | 'completed' | 'failed'
+          status?: 'pending' | 'created' | 'active' | 'completed' | 'succeeded' | 'failed' | 'failed_timeout' | 'failed_payment'
           started_at?: string | null
           completed_at?: string | null
+          ends_at?: string | null
+          evidence_ref?: string | null
           payment_intent_id?: string | null
           completion_lat?: number | null
           completion_lng?: number | null
@@ -128,9 +137,13 @@ export interface Database {
           user_id: string
           amount: number
           stripe_payment_intent_id: string
-          status: 'pending' | 'succeeded' | 'failed'
+          status: 'pending' | 'completed' | 'succeeded' | 'failed' | 'requires_action' | 'processing'
           created_at: string
           updated_at: string
+          idempotency_key: string | null
+          webhook_received_at: string | null
+          stripe_customer_id: string | null
+          requires_action: boolean
         }
         Insert: {
           id?: string
@@ -138,9 +151,13 @@ export interface Database {
           user_id: string
           amount: number
           stripe_payment_intent_id: string
-          status?: 'pending' | 'succeeded' | 'failed'
+          status?: 'pending' | 'completed' | 'succeeded' | 'failed' | 'requires_action' | 'processing'
           created_at?: string
           updated_at?: string
+          idempotency_key?: string | null
+          webhook_received_at?: string | null
+          stripe_customer_id?: string | null
+          requires_action?: boolean
         }
         Update: {
           id?: string
@@ -148,9 +165,13 @@ export interface Database {
           user_id?: string
           amount?: number
           stripe_payment_intent_id?: string
-          status?: 'pending' | 'succeeded' | 'failed'
+          status?: 'pending' | 'completed' | 'succeeded' | 'failed' | 'requires_action' | 'processing'
           created_at?: string
           updated_at?: string
+          idempotency_key?: string | null
+          webhook_received_at?: string | null
+          stripe_customer_id?: string | null
+          requires_action?: boolean
         }
       }
       notifications: {

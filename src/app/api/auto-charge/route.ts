@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Create payment intent for auto-charge
+      // Create payment intent for auto-charge (冪等性キー付き)
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount, // JPY is a zero-decimal currency; use yen as-is
         currency: 'jpy',
@@ -143,9 +143,11 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           type: 'auto_penalty'
         }
+      }, {
+        idempotencyKey: challengeId // 冪等性キーで二重決済防止
       })
 
-      // Record the payment in database
+      // Record the payment in database (冪等性キー付き)
       const { error: insertError } = await supabase
         .from('payments')
         .insert({
@@ -154,7 +156,10 @@ export async function POST(request: NextRequest) {
           amount: amount,
           status: paymentIntent.status === 'succeeded' ? 'completed' : 'failed',
           stripe_payment_intent_id: paymentIntent.id,
+          stripe_customer_id: selectedCustomerId!,
           payment_method: 'auto_charge',
+          idempotency_key: challengeId, // 冪等性キー
+          requires_action: paymentIntent.status === 'requires_action',
           created_at: new Date().toISOString()
         })
 
@@ -173,7 +178,7 @@ export async function POST(request: NextRequest) {
     } catch (stripeError: any) {
       console.error('Stripe auto-charge error:', stripeError)
       
-      // Record failed payment
+      // Record failed payment (冪等性キー付き)
       await supabase
         .from('payments')
         .insert({
@@ -182,8 +187,9 @@ export async function POST(request: NextRequest) {
           amount: amount,
           status: 'failed',
           payment_method: 'auto_charge_failed',
-          created_at: new Date().toISOString(),
-          error_message: stripeError.message
+          idempotency_key: challengeId, // 冪等性キー
+          error_message: stripeError.message,
+          created_at: new Date().toISOString()
         })
 
       // Try to surface payment intent info for client-side 3DS handling

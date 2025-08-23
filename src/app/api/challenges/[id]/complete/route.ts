@@ -56,45 +56,49 @@ export async function POST(
     let isSuccess: boolean
     let distance: number
 
-    // If auto_charge is true, force the challenge to fail
+    // auto_charge の場合は自動失敗（Edge Function からの呼び出し想定）
     if (auto_charge && is_success === false) {
-      // Update challenge status directly for auto-charge failures
-      const { error: updateError } = await supabase
-        .from('challenges')
-        .update({
-          status: 'failed',
-          completed_at: new Date().toISOString(),
-          completion_lat: parseFloat(current_lat),
-          completion_lng: parseFloat(current_lng),
-          completion_address: current_address || '起床時間経過のため自動失敗'
+      // 自動失敗用RPCを使用
+      const { data: autoFailResult, error: autoFailError } = await supabase
+        .rpc('auto_fail_expired_challenge', {
+          challenge_id_param: params.id,
+          failure_reason: 'timeout'
         })
-        .eq('id', params.id)
+        .single()
 
-      if (updateError) {
-        console.error('Error updating challenge for auto-charge:', updateError)
-        return NextResponse.json({ error: 'Failed to update challenge' }, { status: 500 })
+      if (autoFailError) {
+        console.error('Error auto-failing challenge:', autoFailError)
+        return NextResponse.json({ error: 'Failed to auto-fail challenge' }, { status: 500 })
       }
 
       isSuccess = false
-      distance = 0 // Set distance to 0 for auto-charge failures
+      distance = 0
     } else {
-      // Use normal Supabase function to complete the challenge
+      // 通常のユーザー成功申請: 新しいRPC関数を使用
       const { data: completionResult, error: completionError } = await supabase
-        .rpc('complete_challenge', {
-          challenge_id: params.id,
+        .rpc('submit_challenge_success', {
+          challenge_id_param: params.id,
           completion_lat_param: parseFloat(current_lat),
           completion_lng_param: parseFloat(current_lng),
-          completion_address_param: current_address || null
+          completion_address_param: current_address || null,
+          evidence_ref_param: null // 将来の拡張用
         })
+        .single()
 
       if (completionError) {
-        console.error('Error completing challenge:', completionError)
-        return NextResponse.json({ error: 'Failed to complete challenge' }, { status: 500 })
+        console.error('Error submitting challenge success:', completionError)
+        return NextResponse.json({ error: 'Failed to submit challenge success' }, { status: 500 })
       }
 
-      const result = completionResult[0]
-      isSuccess = result.within_range
-      distance = result.distance_to_target
+      if (!(completionResult as any).success) {
+        return NextResponse.json({ 
+          error: (completionResult as any).message,
+          challenge_expired: (completionResult as any).message === 'Challenge time expired'
+        }, { status: 400 })
+      }
+
+      isSuccess = (completionResult as any).within_range
+      distance = (completionResult as any).distance_to_target
     }
 
     // Get updated challenge data

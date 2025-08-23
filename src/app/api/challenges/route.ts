@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       target_time,
+      target_datetime, // 新フィールド: 具体的な終了日時
       home_address,
       home_latitude,
       home_longitude,
@@ -64,7 +65,8 @@ export async function POST(request: NextRequest) {
       wake_up_location_address,
       wake_up_location_lat,
       wake_up_location_lng,
-      status: requestedStatus
+      status: requestedStatus,
+      start_immediately = false // 即座に開始するかどうか
     } = body
 
     // Validate required fields
@@ -72,12 +74,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // target_datetime がある場合はそれを使用、なければ target_time から生成
+    let calculatedTargetDatetime = target_datetime
+    if (!calculatedTargetDatetime && target_time) {
+      // target_time から明日の同時刻を生成
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const timeParts = target_time.split(':')
+      tomorrow.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0)
+      calculatedTargetDatetime = tomorrow.toISOString()
+    }
+
     // Validate numeric fields
     if (isNaN(home_latitude) || isNaN(home_longitude) || isNaN(target_latitude) || isNaN(target_longitude)) {
       return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 })
     }
 
-    // First attempt: insert as-is
+    // チャレンジ作成用ペイロード
     const basePayload = {
       user_id: user.id,
       target_time,
@@ -91,7 +104,8 @@ export async function POST(request: NextRequest) {
       wake_up_location_address,
       wake_up_location_lat: wake_up_location_lat ? parseFloat(wake_up_location_lat) : null,
       wake_up_location_lng: wake_up_location_lng ? parseFloat(wake_up_location_lng) : null,
-      status: requestedStatus || 'pending'
+      status: start_immediately ? 'created' : (requestedStatus || 'pending'),
+      ends_at: start_immediately ? calculatedTargetDatetime : null
     }
 
     let challengeInsertError: any | null = null
@@ -145,7 +159,38 @@ export async function POST(request: NextRequest) {
       // Don't fail challenge creation if notification fails
     }
 
-    return NextResponse.json({ challenge }, { status: 201 })
+    let finalChallenge = challenge
+
+    // 即座開始が要求された場合、start_challenge RPCを呼び出す
+    if (start_immediately && calculatedTargetDatetime) {
+      const { data: startResult, error: startError } = await supabase
+        .rpc('start_challenge', {
+          challenge_id_param: challenge.id,
+          target_datetime_param: calculatedTargetDatetime
+        })
+        .single()
+
+      if (startError) {
+        console.error('Error starting challenge immediately:', startError)
+        // チャレンジは作成済みなので、開始失敗でもエラーにしない
+      } else if ((startResult as any).success) {
+        // 更新されたチャレンジデータを取得
+        const { data: updatedChallenge } = await supabase
+          .from('challenges')
+          .select('*')
+          .eq('id', challenge.id)
+          .single()
+        
+        if (updatedChallenge) {
+          finalChallenge = updatedChallenge
+        }
+      }
+    }
+
+    return NextResponse.json({ 
+      challenge: finalChallenge,
+      started_immediately: start_immediately && finalChallenge.status === 'active'
+    }, { status: 201 })
   } catch (error) {
     console.error('API Error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

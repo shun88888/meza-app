@@ -10,7 +10,7 @@ const corsHeaders = {
 interface Challenge {
   id: string
   user_id: string
-  target_time: string
+  ends_at: string
   penalty_amount: number
   status: string
 }
@@ -46,7 +46,7 @@ serve(async (req) => {
       .from('challenges')
       .select('*')
       .eq('status', 'active')
-      .lt('target_time', now)
+      .lt('ends_at', now)
 
     if (fetchError) {
       console.error('❌ Error fetching expired challenges:', fetchError)
@@ -73,23 +73,28 @@ serve(async (req) => {
       try {
         console.log(`⏰ Processing expired challenge ${challenge.id} for user ${challenge.user_id}`)
 
-        // Update challenge status to failed
-        const { error: updateError } = await supabase
-          .from('challenges')
-          .update({
-            status: 'failed',
-            completed_at: new Date().toISOString(),
-            completion_address: '起床時間経過のため自動失敗'
+        // 新しいRPC関数で自動失敗処理（行ロック付き）
+        const { data: autoFailResult, error: autoFailError } = await supabase
+          .rpc('auto_fail_expired_challenge', {
+            challenge_id_param: challenge.id,
+            failure_reason: 'timeout'
           })
-          .eq('id', challenge.id)
+          .single()
 
-        if (updateError) {
-          console.error(`❌ Failed to update challenge ${challenge.id}:`, updateError)
+        if (autoFailError) {
+          console.error(`❌ Failed to auto-fail challenge ${challenge.id}:`, autoFailError)
           failedCount++
           continue
         }
 
-        // Get user's payment methods
+        if (!autoFailResult.success) {
+          console.warn(`⚠️ Challenge ${challenge.id} already processed or not found`)
+          continue
+        }
+
+        const penaltyAmount = autoFailResult.penalty_amount
+
+        // ユーザーのペイメントメソッド取得
         const { data: paymentMethods, error: paymentError } = await supabase
           .from('payment_methods')
           .select('*')
@@ -99,14 +104,15 @@ serve(async (req) => {
         if (paymentError || !paymentMethods || paymentMethods.length === 0) {
           console.error(`❌ No payment method found for user ${challenge.user_id}`)
           
-          // Record failed payment attempt
+          // 失敗レコードを冪等性キー付きで保存
           await supabase.from('payments').insert({
             user_id: challenge.user_id,
             challenge_id: challenge.id,
-            amount: challenge.penalty_amount,
+            amount: penaltyAmount,
             status: 'failed',
             payment_method: 'no_payment_method',
             error_message: 'No payment method available',
+            idempotency_key: challenge.id, // 冪等性キー
             created_at: new Date().toISOString()
           })
 
@@ -117,12 +123,12 @@ serve(async (req) => {
         // Use the default payment method or the first one
         const defaultPaymentMethod = paymentMethods.find((pm: PaymentMethod) => pm.is_default) || paymentMethods[0]
 
-        // Process automatic payment
+        // 自動決済処理（冪等性キー付き）
         try {
           console.log(`💳 Processing payment for challenge ${challenge.id}`)
 
           const paymentIntent = await stripe.paymentIntents.create({
-            amount: challenge.penalty_amount, // JPY is zero-decimal; use yen as-is
+            amount: penaltyAmount, // JPY is zero-decimal; use yen as-is
             currency: 'jpy',
             customer: defaultPaymentMethod.stripe_customer_id,
             payment_method: defaultPaymentMethod.stripe_payment_method_id,
@@ -135,18 +141,23 @@ serve(async (req) => {
               type: 'auto_penalty_cron',
               processed_at: new Date().toISOString()
             }
+          }, {
+            idempotencyKey: challenge.id // 冪等性キーで二重決済防止
           })
 
-          // Record the payment in database
+          // 決済結果をデータベースに記録（冪等性キー付き）
           const { error: paymentInsertError } = await supabase
             .from('payments')
             .insert({
               user_id: challenge.user_id,
               challenge_id: challenge.id,
-              amount: challenge.penalty_amount,
+              amount: penaltyAmount,
               status: paymentIntent.status === 'succeeded' ? 'completed' : 'failed',
               stripe_payment_intent_id: paymentIntent.id,
+              stripe_customer_id: defaultPaymentMethod.stripe_customer_id,
               payment_method: 'auto_charge_cron',
+              idempotency_key: challenge.id, // 冪等性キー
+              requires_action: paymentIntent.status === 'requires_action',
               created_at: new Date().toISOString()
             })
 
@@ -157,11 +168,11 @@ serve(async (req) => {
           if (paymentIntent.status === 'succeeded') {
             console.log(`✅ Payment successful for challenge ${challenge.id}`)
             
-            // Send success notification
+            // 成功通知を送信
             await supabase.rpc('send_notification', {
               user_id_param: challenge.user_id,
               title_param: 'チャレンジ自動決済完了',
-              body_param: `起床時間を過ぎたため、ペナルティ料金 ¥${challenge.penalty_amount.toLocaleString()} が自動決済されました。`,
+              body_param: `起床時間を過ぎたため、ペナルティ料金 ¥${penaltyAmount.toLocaleString()} が自動決済されました。`,
               type_param: 'payment'
             })
 
@@ -169,11 +180,11 @@ serve(async (req) => {
           } else {
             console.error(`❌ Payment failed for challenge ${challenge.id}:`, paymentIntent.status)
             
-            // Send failure notification
+            // 失敗通知を送信
             await supabase.rpc('send_notification', {
               user_id_param: challenge.user_id,
               title_param: 'チャレンジ決済失敗',
-              body_param: `自動決済に失敗しました。手動で決済を完了してください。金額: ¥${challenge.penalty_amount.toLocaleString()}`,
+              body_param: `自動決済に失敗しました。手動で決済を完了してください。金額: ¥${penaltyAmount.toLocaleString()}`,
               type_param: 'payment_error'
             })
 
@@ -183,18 +194,19 @@ serve(async (req) => {
         } catch (stripeError: any) {
           console.error(`❌ Stripe error for challenge ${challenge.id}:`, stripeError)
           
-          // Record failed payment
+          // 失敗レコードを冪等性キー付きで保存
           await supabase.from('payments').insert({
             user_id: challenge.user_id,
             challenge_id: challenge.id,
-            amount: challenge.penalty_amount,
+            amount: penaltyAmount,
             status: 'failed',
             payment_method: 'auto_charge_cron_failed',
             error_message: stripeError.message,
+            idempotency_key: challenge.id, // 冪等性キー
             created_at: new Date().toISOString()
           })
 
-          // Send error notification
+          // エラー通知を送信
           await supabase.rpc('send_notification', {
             user_id_param: challenge.user_id,
             title_param: 'チャレンジ決済エラー',
