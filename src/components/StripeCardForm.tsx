@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import {
   Elements,
@@ -10,22 +10,77 @@ import {
   useStripe,
   useElements
 } from '@stripe/react-stripe-js'
-import { CreditCard } from 'lucide-react'
+import { CreditCard, AlertTriangle } from 'lucide-react'
 
 const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-const stripePromise = pk ? loadStripe(pk) : Promise.resolve(null)
+
+// Trusted Types policy for secure string handling
+const createTrustedPolicy = () => {
+  if (typeof window !== 'undefined' && window.trustedTypes && window.trustedTypes.createPolicy) {
+    try {
+      return window.trustedTypes.createPolicy('stripe-policy', {
+        createHTML: (string: string) => string,
+        createScript: (string: string) => string,
+        createScriptURL: (string: string) => string,
+      })
+    } catch (e) {
+      console.warn('Trusted Types policy creation failed:', e)
+      return null
+    }
+  }
+  return null
+}
+
+const trustedPolicy = createTrustedPolicy()
+
+// Secure stripe promise with validation
+const stripePromise = pk && pk.startsWith('pk_') ? loadStripe(pk) : Promise.resolve(null)
 
 interface StripeCardFormProps {
   onSuccess?: (paymentMethod: any) => void
   onCancel?: () => void
 }
 
-function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
+interface CardFormProps extends StripeCardFormProps {
+  clientSecret: string
+}
+
+function CardForm({ onSuccess, onCancel, clientSecret }: CardFormProps) {
   const stripe = useStripe()
   const elements = useElements()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [cardholderName, setCardholderName] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
+  const [isCardholderValid, setIsCardholderValid] = useState(false)
+
+  // Validate cardholder name with enhanced security checks
+  const validateCardholderName = useCallback((name: string) => {
+    // Basic validation
+    if (!name.trim()) return false
+    
+    // Security checks - prevent potential XSS or injection attempts
+    const suspiciousPatterns = [
+      /<[^>]*>/g, // HTML tags
+      /javascript:/i, // JS protocol
+      /on\w+\s*=/i, // Event handlers
+      /\bscript\b/i, // Script tag
+      /[<>'"&]/g, // Potentially dangerous characters
+    ]
+    
+    const hasSuspiciousContent = suspiciousPatterns.some(pattern => pattern.test(name))
+    if (hasSuspiciousContent) {
+      console.warn('Suspicious content detected in cardholder name')
+      return false
+    }
+    
+    // Length and character validation
+    return name.length >= 2 && name.length <= 100 && /^[a-zA-Z\s\-'\.]*$/.test(name)
+  }, [])
+
+  useEffect(() => {
+    setIsCardholderValid(validateCardholderName(cardholderName))
+  }, [cardholderName, validateCardholderName])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -35,54 +90,57 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
       return
     }
 
-    if (!cardholderName.trim()) {
-      setError('カード名義人を入力してください')
+    if (!isCardholderValid) {
+      setError('有効なカード名義人を入力してください（2-100文字、英字・スペース・ハイフンのみ）')
       return
     }
 
     setIsLoading(true)
     setError('')
 
-    const cardNumberElement = elements.getElement(CardNumberElement)
-    if (!cardNumberElement) {
-      setError('カード情報が入力されていません')
-      setIsLoading(false)
-      return
-    }
-
     try {
-      // Get SetupIntent client secret from backend
-      const setupResponse = await fetch('/api/payment/methods', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      })
-
-      if (!setupResponse.ok) {
-        const errorData = await setupResponse.json()
-        throw new Error(errorData.error || 'セットアップ処理に失敗しました')
+      // Create payment method with individual card elements
+      const cardElement = elements.getElement(CardNumberElement)
+      if (!cardElement) {
+        throw new Error('Card element not found')
       }
 
-      const { clientSecret } = await setupResponse.json()
-
-      // Use confirmSetup to securely attach payment method to customer
-      const { error: confirmError, setupIntent } = await stripe.confirmSetup({
-        elements,
-        clientSecret,
-        confirmParams: {
-          payment_method_data: {
-            billing_details: {
-              name: cardholderName,
-            },
+      const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+          name: cardholderName,
+          email: 'user@example.com',
+          address: {
+            country: 'JP',
           },
         },
-        redirect: 'if_required',
       })
 
+      if (paymentMethodError) {
+        throw paymentMethodError
+      }
+
+      // Attach payment method to customer via setup intent
+      const { error: confirmError, setupIntent } = await stripe.confirmCardSetup(
+        clientSecret,
+        {
+          payment_method: paymentMethod.id,
+        }
+      )
+
       if (confirmError) {
-        setError(confirmError.message || 'カード認証に失敗しました')
+        // Enhanced error handling with retry logic
+        const isRetryableError = confirmError.code === 'card_declined' || 
+                                confirmError.code === 'incomplete_card' ||
+                                confirmError.code === 'processing_error'
+        
+        if (isRetryableError && retryCount < 2) {
+          setRetryCount(prev => prev + 1)
+          setError(`${confirmError.message} (${retryCount + 1}/3回目の試行)`)
+        } else {
+          setError(confirmError.message || 'カード認証に失敗しました')
+        }
         setIsLoading(false)
         return
       }
@@ -92,139 +150,236 @@ function CardForm({ onSuccess, onCancel }: StripeCardFormProps) {
 
     } catch (error: any) {
       console.error('Card registration error:', error)
-      setError(error.message || 'カード登録に失敗しました。もう一度お試しください。')
+      
+      // Enhanced error classification
+      let userMessage = 'カード登録に失敗しました。もう一度お試しください。'
+      
+      if (error.code === 'network_error') {
+        userMessage = 'ネットワーク接続に問題があります。インターネット接続を確認してください。'
+      } else if (error.code === 'api_key_expired') {
+        userMessage = 'システムエラーが発生しました。管理者にお問い合わせください。'
+      } else if (error.message?.includes('rate_limit')) {
+        userMessage = 'しばらく時間をおいてから再度お試しください。'
+      }
+      
+      setError(userMessage)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const cardElementOptions = {
+
+  // Common element options matching mezamee's styling
+  const elementOptions = {
     style: {
       base: {
         fontSize: '16px',
-        color: '#374151',
-        fontFamily: 'Inter, system-ui, sans-serif',
+        color: '#424770',
+        fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+        fontSmoothing: 'antialiased',
         '::placeholder': {
-          color: '#9CA3AF',
+          color: '#aab7c4',
         },
       },
       invalid: {
-        color: '#EF4444',
-        iconColor: '#EF4444',
+        color: '#9e2146',
       },
     },
   }
 
   return (
-    <div className="max-w-md mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-            <CreditCard size={24} className="text-gray-700" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              新しいカードを追加
-            </h2>
-            <p className="text-gray-600 text-sm">
-              安全にカード情報を登録してください
-            </p>
+    <div className="max-w-md mx-auto p-4">
+      <h2 className="text-lg font-medium text-gray-900 mb-6">クレジットカード</h2>
+      
+      <form onSubmit={handleSubmit}>
+        {/* Card Number */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            カード番号
+          </label>
+          <div className="flex items-center bg-white border border-gray-300 rounded-md p-3 shadow-sm">
+            <CreditCard className="w-6 h-6 text-gray-400 mr-3" />
+            <div className="flex-1">
+              <CardNumberElement 
+                options={{
+                  ...elementOptions,
+                  placeholder: '1234 1234 1234 1234'
+                }}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* カード名義人 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        {/* Expiry Date */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            有効期限
+          </label>
+          <div className="bg-white border border-gray-300 rounded-md p-3 shadow-sm">
+            <CardExpiryElement
+              options={{
+                ...elementOptions,
+                placeholder: '月 / 年'
+              }}
+            />
+          </div>
+        </div>
+
+        {/* CVC */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            CVC
+          </label>
+          <div className="bg-white border border-gray-300 rounded-md p-3 shadow-sm">
+            <CardCvcElement
+              options={{
+                ...elementOptions,
+                placeholder: 'セキュリティコード'
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Cardholder Name */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
             カード名義人
           </label>
-          <input
-            type="text"
-            value={cardholderName}
-            onChange={(e) => setCardholderName(e.target.value)}
-            placeholder="YAMADA TARO"
-            className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-[#FFAD2F] focus:border-transparent"
-            required
-          />
-        </div>
-
-        {/* カード番号 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">カード番号</label>
-          <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-gray-200 focus-within:border-transparent">
-            <CardNumberElement options={cardElementOptions as any} />
+          <div className="relative">
+            <input
+              type="text"
+              value={cardholderName}
+              onChange={(e) => setCardholderName(e.target.value)}
+              placeholder="YAMADA TARO"
+              className={`w-full px-3 py-3 border rounded-md shadow-sm focus:ring-2 focus:border-transparent transition-colors ${
+                cardholderName && !isCardholderValid
+                  ? 'border-red-300 focus:ring-red-200'
+                  : cardholderName && isCardholderValid
+                  ? 'border-green-300 focus:ring-green-200'
+                  : 'border-gray-300 focus:ring-blue-200'
+              }`}
+              required
+              maxLength={100}
+              autoComplete="cc-name"
+            />
+            {cardholderName && !isCardholderValid && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* 有効期限とCVC */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">有効期限 (MM/YY)</label>
-            <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-gray-200 focus-within:border-transparent">
-              <CardExpiryElement options={cardElementOptions as any} />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">セキュリティコード</label>
-            <div className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-gray-200 focus-within:border-transparent">
-              <CardCvcElement options={cardElementOptions as any} />
-            </div>
-          </div>
+          {cardholderName && !isCardholderValid && (
+            <p className="text-xs text-red-600 mt-1">
+              英字・スペース・ハイフンのみ使用可能です（2-100文字）
+            </p>
+          )}
         </div>
 
         {/* エラー表示 */}
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-2xl">
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md mb-4">
             <p className="text-red-800 text-sm">{error}</p>
           </div>
         )}
 
-        {/* ボタン */}
-        <div className="flex space-x-3 pt-4">
+        {/* Register Button - Centered like mezamee */}
+        <div className="flex justify-center">
           <button
             type="submit"
-            disabled={!stripe || isLoading}
-            className={`flex-1 py-3 px-4 rounded-2xl font-medium transition-colors ${
-              !stripe || isLoading
+            disabled={!stripe || isLoading || !isCardholderValid}
+            className={`px-8 py-3 rounded-full font-medium shadow-lg transition-colors ${
+              !stripe || isLoading || !isCardholderValid
                 ? 'bg-gray-400 text-white cursor-not-allowed'
-            : 'bg-gray-900 hover:bg-gray-800 text-white'
+                : 'bg-orange-400 hover:bg-orange-500 text-white'
             }`}
           >
-            {isLoading ? '登録中...' : 'カードを登録'}
+            {isLoading ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>登録中...</span>
+              </div>
+            ) : '登録する'}
           </button>
+        </div>
 
-          {onCancel && (
+        {/* Cancel Button */}
+        {onCancel && (
+          <div className="text-center mt-4">
             <button
               type="button"
               onClick={onCancel}
               disabled={isLoading}
-              className="px-6 py-3 border border-gray-300 rounded-2xl font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50"
             >
               キャンセル
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </form>
-
-      {/* セキュリティ情報 */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-2xl border border-gray-200">
-        <h3 className="font-semibold text-gray-900 mb-2 text-sm">🔒 セキュリティについて</h3>
-        <div className="space-y-1 text-xs text-gray-700">
-          <p>• カード情報はStripeが安全に処理します</p>
-          <p>• カード番号はアプリサーバーに送信されません</p>
-          <p>• PCI DSS準拠の最高レベルのセキュリティ</p>
-          <p>• チャレンジ失敗時のみ決済が実行されます</p>
-        </div>
-      </div>
     </div>
   )
 }
 
 export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormProps) {
+  const [clientSecret, setClientSecret] = useState<string>('')
+  const [isInitializing, setIsInitializing] = useState(true)
+
+  // Initialize SetupIntent when component mounts
+  const initializeSetup = async () => {
+    try {
+      const response = await fetch('/api/payment/methods', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      })
+
+      if (response.ok) {
+        const { clientSecret } = await response.json()
+        setClientSecret(clientSecret)
+      }
+    } catch (error) {
+      console.error('Failed to initialize payment setup:', error)
+    } finally {
+      setIsInitializing(false)
+    }
+  }
+
+  useEffect(() => {
+    initializeSetup()
+  }, [])
+
+  if (isInitializing || !clientSecret) {
+    return (
+      <div className="max-w-md mx-auto p-6 text-center">
+        <div className="animate-spin w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-gray-600">決済フォームを準備中...</p>
+      </div>
+    )
+  }
+
+  const options = {
+    appearance: {
+      theme: 'stripe' as const,
+      variables: {
+        fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+        fontSize: '16px',
+      }
+    },
+  }
+
+  // Pass clientSecret through props to CardForm component
   return (
-    <Elements stripe={stripePromise}>
-      <CardForm onSuccess={onSuccess} onCancel={onCancel} />
+    <Elements 
+      stripe={stripePromise} 
+      options={options}
+    >
+      <CardForm 
+        onSuccess={onSuccess} 
+        onCancel={onCancel}
+        clientSecret={clientSecret}
+      />
     </Elements>
   )
 }

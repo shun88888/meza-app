@@ -83,7 +83,7 @@ export default function PaymentMethodPage() {
   const handleSetDefault = async (id: string) => {
     try {
       const resp = await fetch('/api/payment/methods', {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentMethodId: id, setAsDefault: true })
       })
@@ -229,7 +229,6 @@ export default function PaymentMethodPage() {
               )}
             </div>
           </div>
-
 
           {/* Payment Info */}
           <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
