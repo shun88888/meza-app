@@ -326,7 +326,6 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
 
   // Initialize SetupIntent when component mounts
   const initializeSetup = async () => {
-    console.log('Initializing payment setup...')
     try {
       const response = await fetch('/api/payment/methods', {
         method: 'POST',
@@ -336,30 +335,14 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
         body: JSON.stringify({}),
       })
 
-      console.log('API response status:', response.status)
-      console.log('API response headers:', Object.fromEntries(response.headers.entries()))
-
       if (response.ok) {
         const data = await response.json()
-        console.log('API response data:', data)
         setClientSecret(data.clientSecret)
       } else {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('API error response:', errorData)
-        console.error('Response status:', response.status, response.statusText)
-        console.error('Error details:', JSON.stringify(errorData, null, 2))
-        
-        // Show user-friendly error message
-        if (errorData.error) {
-          console.error('Specific error:', errorData.error)
-        }
-        if (errorData.code) {
-          console.error('Error code:', errorData.code)
-        }
+        console.error('Payment setup failed:', response.status)
       }
     } catch (error) {
       console.error('Failed to initialize payment setup:', error)
-      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsInitializing(false)
     }

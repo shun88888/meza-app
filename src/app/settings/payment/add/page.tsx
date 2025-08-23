@@ -101,13 +101,6 @@ export default function AddPaymentMethodPage() {
 
         {/* Content */}
         <div className="p-4">
-          {/* Debug Info - Remove in production */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mb-4">
-              <DebugInfo />
-            </div>
-          )}
-          
           <StripeCardForm
             onSuccess={handleSuccess}
             onCancel={handleBack}
