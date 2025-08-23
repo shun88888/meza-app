@@ -3,15 +3,7 @@ import Stripe from 'stripe'
 
 export async function GET(request: NextRequest) {
   try {
-    // 開発環境のみで実行
-    if (process.env.NODE_ENV !== 'development') {
-      return NextResponse.json(
-        { error: 'This endpoint is only available in development' }, 
-        { status: 403 }
-      )
-    }
 
-    // 開発環境では認証をスキップ
     console.log('🧪 Testing Stripe connection...')
 
     const stripeKey = process.env.STRIPE_SECRET_KEY

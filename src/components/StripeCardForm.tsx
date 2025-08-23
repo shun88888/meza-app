@@ -45,6 +45,80 @@ interface CardFormProps extends StripeCardFormProps {
   clientSecret: string
 }
 
+// Direct Stripe form without server-side setup
+function DirectStripeForm({ onSuccess, onCancel }: StripeCardFormProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string>('')
+  const [cardholderName, setCardholderName] = useState('')
+  const [isCardholderValid, setIsCardholderValid] = useState(false)
+
+  const validateCardholderName = useCallback((name: string) => {
+    if (!name.trim()) return false
+    const suspiciousPatterns = [
+      /<[^>]*>/g, /javascript:/i, /on\w+\s*=/i, /\bscript\b/i, /[<>'"&]/g,
+    ]
+    const hasSuspiciousContent = suspiciousPatterns.some(pattern => pattern.test(name))
+    if (hasSuspiciousContent) return false
+    return name.length >= 2 && name.length <= 100 && /^[a-zA-Z\s\-'\.]*$/.test(name)
+  }, [])
+
+  useEffect(() => {
+    setIsCardholderValid(validateCardholderName(cardholderName))
+  }, [cardholderName, validateCardholderName])
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setError('この機能は現在開発中です。サーバー経由の登録をお試しください。')
+  }
+
+  return (
+    <div className="max-w-md mx-auto p-4">
+      <h3 className="text-lg font-medium text-gray-900 mb-6">代替カード登録</h3>
+      
+      <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            カード名義人
+          </label>
+          <input
+            type="text"
+            value={cardholderName}
+            onChange={(e) => setCardholderName(e.target.value)}
+            placeholder="YAMADA TARO"
+            className="w-full px-3 py-3 border border-gray-300 rounded-md shadow-sm"
+            maxLength={100}
+          />
+        </div>
+
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md mb-4">
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
+
+        <div className="flex justify-center space-x-3">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-400"
+          >
+            開発中
+          </button>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            >
+              戻る
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+  )
+}
+
 function CardForm({ onSuccess, onCancel, clientSecret }: CardFormProps) {
   const stripe = useStripe()
   const elements = useElements()
@@ -323,8 +397,9 @@ function CardForm({ onSuccess, onCancel, clientSecret }: CardFormProps) {
 export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormProps) {
   const [clientSecret, setClientSecret] = useState<string>('')
   const [isInitializing, setIsInitializing] = useState(true)
+  const [useDirectSetup, setUseDirectSetup] = useState(false)
 
-  // Initialize SetupIntent when component mounts
+  // Primary initialization method - try server-side first
   const initializeSetup = async () => {
     try {
       const response = await fetch('/api/payment/methods', {
@@ -339,10 +414,14 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
         const data = await response.json()
         setClientSecret(data.clientSecret)
       } else {
-        console.error('Payment setup failed:', response.status)
+        console.error('Server-side setup failed:', response.status)
+        // Fallback to direct client setup
+        setUseDirectSetup(true)
       }
     } catch (error) {
-      console.error('Failed to initialize payment setup:', error)
+      console.error('Server setup error, trying direct setup:', error)
+      // Fallback to direct client setup
+      setUseDirectSetup(true)
     } finally {
       setIsInitializing(false)
     }
@@ -361,6 +440,22 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
     )
   }
 
+  // Handle fallback to direct client setup
+  if (!clientSecret && useDirectSetup) {
+    return (
+      <div className="max-w-md mx-auto p-6 text-center">
+        <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-yellow-600 text-xl">🔧</span>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">代替方法でカード登録</h3>
+        <p className="text-gray-600 text-sm mb-4">
+          サーバー経由での初期化に失敗しました。代替方法をお試しください。
+        </p>
+        <DirectStripeForm onSuccess={onSuccess} onCancel={onCancel} />
+      </div>
+    )
+  }
+
   if (!clientSecret) {
     return (
       <div className="max-w-md mx-auto p-6 text-center">
@@ -374,14 +469,21 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
         <button
           onClick={() => {
             setIsInitializing(true)
+            setUseDirectSetup(false)
             initializeSetup()
           }}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors mr-2"
         >
           再試行
         </button>
+        <button
+          onClick={() => setUseDirectSetup(true)}
+          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors"
+        >
+          代替方法
+        </button>
         <p className="text-xs text-gray-500 mt-4">
-          問題が解決しない場合は、サポートまでお問い合わせください。
+          問題が解決しない場合は、代替方法をお試しください。
         </p>
       </div>
     )
