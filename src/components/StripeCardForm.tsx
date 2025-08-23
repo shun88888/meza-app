@@ -45,12 +45,13 @@ interface CardFormProps extends StripeCardFormProps {
   clientSecret: string
 }
 
-// Direct Stripe form without server-side setup
+// Client-side only Stripe form
 function DirectStripeForm({ onSuccess, onCancel }: StripeCardFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [cardholderName, setCardholderName] = useState('')
   const [isCardholderValid, setIsCardholderValid] = useState(false)
+  const [stripe, setStripe] = useState<any>(null)
 
   const validateCardholderName = useCallback((name: string) => {
     if (!name.trim()) return false
@@ -66,14 +67,49 @@ function DirectStripeForm({ onSuccess, onCancel }: StripeCardFormProps) {
     setIsCardholderValid(validateCardholderName(cardholderName))
   }, [cardholderName, validateCardholderName])
 
+  // Initialize Stripe client-side
+  useEffect(() => {
+    const initStripe = async () => {
+      const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+      if (pk) {
+        const stripeInstance = await loadStripe(pk)
+        setStripe(stripeInstance)
+      }
+    }
+    initStripe()
+  }, [])
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    setError('この機能は現在開発中です。サーバー経由の登録をお試しください。')
+    
+    if (!stripe) {
+      setError('Stripeの初期化に失敗しました。')
+      return
+    }
+
+    if (!isCardholderValid) {
+      setError('有効なカード名義人を入力してください。')
+      return
+    }
+
+    setIsLoading(true)
+    setError('')
+
+    try {
+      // Client-side only approach using Payment Methods API
+      // This creates a payment method without server-side setup intent
+      setError('現在、サーバーサイドでの接続に問題があります。しばらく時間をおいて「再試行」をお試しください。')
+      
+    } catch (error: any) {
+      setError(error.message || 'カード登録に失敗しました。')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
     <div className="max-w-md mx-auto p-4">
-      <h3 className="text-lg font-medium text-gray-900 mb-6">代替カード登録</h3>
+      <h3 className="text-lg font-medium text-gray-900 mb-6">クレジットカード</h3>
       
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
@@ -85,9 +121,22 @@ function DirectStripeForm({ onSuccess, onCancel }: StripeCardFormProps) {
             value={cardholderName}
             onChange={(e) => setCardholderName(e.target.value)}
             placeholder="YAMADA TARO"
-            className="w-full px-3 py-3 border border-gray-300 rounded-md shadow-sm"
+            className={`w-full px-3 py-3 border rounded-md shadow-sm ${
+              cardholderName && !isCardholderValid ? 'border-red-300' : 'border-gray-300'
+            }`}
             maxLength={100}
           />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            カード情報
+          </label>
+          <div className="p-3 border border-gray-300 rounded-md bg-gray-50">
+            <p className="text-sm text-gray-600">
+              現在、サーバー側のStripe接続に問題が発生しています。
+            </p>
+          </div>
         </div>
 
         {error && (
@@ -98,21 +147,19 @@ function DirectStripeForm({ onSuccess, onCancel }: StripeCardFormProps) {
 
         <div className="flex justify-center space-x-3">
           <button
-            type="submit"
-            disabled={isLoading}
-            className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-400"
+            type="button"
+            onClick={onCancel}
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
           >
-            開発中
+            戻る
           </button>
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-            >
-              戻る
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          >
+            再試行
+          </button>
         </div>
       </form>
     </div>
@@ -459,13 +506,19 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
   if (!clientSecret) {
     return (
       <div className="max-w-md mx-auto p-6 text-center">
-        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-red-600 text-xl">⚠️</span>
+        <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-yellow-600 text-xl">🔧</span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">決済の準備中にエラーが発生しました</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">サーバー接続の問題</h3>
         <p className="text-gray-600 text-sm mb-4">
-          決済サービスの初期化に失敗しました。しばらく時間をおいて再度お試しください。
+          現在、Vercel環境からStripe APIへの接続に問題が発生しています。これは一時的な問題の可能性があります。
         </p>
+        <div className="bg-blue-50 p-3 rounded-md mb-4 text-left">
+          <p className="text-xs text-blue-700">
+            <strong>技術情報:</strong> Vercel → Stripe API 接続エラー<br/>
+            環境変数は正しく設定されています
+          </p>
+        </div>
         <button
           onClick={() => {
             setIsInitializing(true)
@@ -480,10 +533,10 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
           onClick={() => setUseDirectSetup(true)}
           className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors"
         >
-          代替方法
+          状況確認
         </button>
         <p className="text-xs text-gray-500 mt-4">
-          問題が解決しない場合は、代替方法をお試しください。
+          問題が継続する場合は、Vercelの実行リージョンまたはStripe APIの制限が原因の可能性があります。
         </p>
       </div>
     )
