@@ -326,6 +326,7 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
 
   // Initialize SetupIntent when component mounts
   const initializeSetup = async () => {
+    console.log('Initializing payment setup...')
     try {
       const response = await fetch('/api/payment/methods', {
         method: 'POST',
@@ -335,12 +336,21 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
         body: JSON.stringify({}),
       })
 
+      console.log('API response status:', response.status)
+      console.log('API response headers:', Object.fromEntries(response.headers.entries()))
+
       if (response.ok) {
-        const { clientSecret } = await response.json()
-        setClientSecret(clientSecret)
+        const data = await response.json()
+        console.log('API response data:', data)
+        setClientSecret(data.clientSecret)
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('API error response:', errorData)
+        console.error('Response status:', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Failed to initialize payment setup:', error)
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsInitializing(false)
     }
@@ -350,11 +360,37 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
     initializeSetup()
   }, [])
 
-  if (isInitializing || !clientSecret) {
+  if (isInitializing) {
     return (
       <div className="max-w-md mx-auto p-6 text-center">
         <div className="animate-spin w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full mx-auto mb-4"></div>
         <p className="text-gray-600">決済フォームを準備中...</p>
+      </div>
+    )
+  }
+
+  if (!clientSecret) {
+    return (
+      <div className="max-w-md mx-auto p-6 text-center">
+        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-red-600 text-xl">⚠️</span>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">決済の準備中にエラーが発生しました</h3>
+        <p className="text-gray-600 text-sm mb-4">
+          決済サービスの初期化に失敗しました。しばらく時間をおいて再度お試しください。
+        </p>
+        <button
+          onClick={() => {
+            setIsInitializing(true)
+            initializeSetup()
+          }}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+        >
+          再試行
+        </button>
+        <p className="text-xs text-gray-500 mt-4">
+          問題が解決しない場合は、サポートまでお問い合わせください。
+        </p>
       </div>
     )
   }

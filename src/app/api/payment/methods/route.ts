@@ -122,8 +122,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('POST /api/payment/methods - Starting request')
+  console.log('Environment:', process.env.NODE_ENV)
+  console.log('Stripe configured:', !!stripe)
+  console.log('STRIPE_SECRET_KEY exists:', !!process.env.STRIPE_SECRET_KEY)
+  
   // Check if Stripe is configured
   if (!stripe) {
+    console.error('Stripe not configured - STRIPE_SECRET_KEY missing')
     return NextResponse.json(
       { error: 'Payment service is not configured' },
       { status: 503 }
@@ -132,70 +138,107 @@ export async function POST(request: NextRequest) {
   // At this point, stripe is guaranteed to be non-null
 
   try {
+    console.log('Creating Supabase client...')
     const supabase = createServerSideClient()
     const { data: { user }, error: userError } = await supabase.auth.getUser()
 
+    console.log('User check result:', { user: !!user, error: !!userError })
+    if (userError) {
+      console.error('User auth error:', userError)
+    }
+
     if (userError || !user) {
+      console.log('Returning 401 - unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get user profile
+    console.log('Fetching user profile for user ID:', user.id)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('stripe_customer_id, email')
       .eq('id', user.id)
       .single()
 
+    console.log('Profile fetch result:', { profile: !!profile, error: !!profileError })
     if (profileError) {
+      console.error('Profile fetch error:', profileError)
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
     let customerId = profile.stripe_customer_id
+    console.log('Existing customer ID:', customerId)
 
     // Create customer if not exists
     if (!customerId) {
-      const customer = await withRetries(() =>
-        stripe!.customers.create({
-          email: profile.email,
-          metadata: {
-            userId: user.id
-          }
-        })
-      )
-      
-      customerId = customer.id
+      console.log('Creating new Stripe customer...')
+      try {
+        const customer = await withRetries(() =>
+          stripe!.customers.create({
+            email: profile.email,
+            metadata: {
+              userId: user.id
+            }
+          })
+        )
+        
+        customerId = customer.id
+        console.log('Created customer with ID:', customerId)
 
-      // Update profile with customer ID
-      await supabase
-        .from('profiles')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', user.id)
+        // Update profile with customer ID
+        const updateResult = await supabase
+          .from('profiles')
+          .update({ stripe_customer_id: customerId })
+          .eq('id', user.id)
+        
+        console.log('Profile update result:', updateResult)
+      } catch (customerError) {
+        console.error('Customer creation error:', customerError)
+        throw customerError
+      }
     }
 
     // Create SetupIntent for secure card saving
-    const setupIntent = await withRetries(() =>
-      stripe!.setupIntents.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        usage: 'off_session',
-      })
-    )
+    console.log('Creating SetupIntent for customer:', customerId)
+    try {
+      const setupIntent = await withRetries(() =>
+        stripe!.setupIntents.create({
+          customer: customerId,
+          payment_method_types: ['card'],
+          usage: 'off_session',
+        })
+      )
 
-    return NextResponse.json({ 
-      clientSecret: setupIntent.client_secret
-    })
+      console.log('SetupIntent created successfully:', setupIntent.id)
+      return NextResponse.json({ 
+        clientSecret: setupIntent.client_secret
+      })
+    } catch (setupError) {
+      console.error('SetupIntent creation error:', setupError)
+      throw setupError
+    }
 
   } catch (error) {
     console.error('Error creating setup intent:', error)
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    console.error('Error details:', JSON.stringify(error, null, 2))
     
     if (error instanceof Stripe.errors.StripeError) {
+      console.error('Stripe error details:', {
+        type: error.type,
+        code: error.code,
+        message: error.message,
+        statusCode: error.statusCode
+      })
       return NextResponse.json({
-        error: `Stripe error: ${error.message}`
+        error: `Stripe error: ${error.message}`,
+        type: error.type,
+        code: error.code
       }, { status: 400 })
     }
 
     return NextResponse.json(
-      { error: 'Failed to create setup intent' },
+      { error: 'Failed to create setup intent', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
