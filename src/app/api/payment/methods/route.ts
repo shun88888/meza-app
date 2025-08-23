@@ -8,40 +8,59 @@ if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',
     // Increase resilience to transient network issues
-    maxNetworkRetries: 3,
-    timeout: 60000,
+    maxNetworkRetries: 5,
+    timeout: 30000, // Reduce timeout for faster failure detection
+    // Force IPv4 to avoid IPv6 issues
+    host: 'api.stripe.com',
+    protocol: 'https',
   })
 }
 
-// Simple exponential backoff retry helper for transient errors
+// Enhanced exponential backoff retry helper for transient errors
 async function withRetries<T>(
   fn: () => Promise<T>,
-  retries: number = 2,
-  baseDelayMs: number = 300
+  retries: number = 3,
+  baseDelayMs: number = 500
 ): Promise<T> {
   let attempt = 0
+  let lastError: any
+  
   // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
-      return await fn()
+      console.log(`Attempt ${attempt + 1}/${retries + 1}`)
+      const result = await fn()
+      console.log(`Attempt ${attempt + 1} succeeded`)
+      return result
     } catch (error: any) {
+      lastError = error
       attempt += 1
+      console.log(`Attempt ${attempt} failed:`, error.message, error.type)
+      
       const isStripeError = error && (error as any).type
       const status = (error as any)?.statusCode as number | undefined
       const retriable =
         // Stripe connection/server errors
         (isStripeError && (
+          (error as any).type === 'StripeConnectionError' ||
           (error as any).type === 'api_connection_error' ||
           (error as any).type === 'api_error' ||
           (error as any).type === 'rate_limit_error'
         )) ||
         // Generic 5xx
-        (typeof status === 'number' && status >= 500)
+        (typeof status === 'number' && status >= 500) ||
+        // Network timeouts
+        error.message?.includes('timeout') ||
+        error.message?.includes('ECONNRESET') ||
+        error.message?.includes('ENOTFOUND')
 
       if (!retriable || attempt > retries) {
-        throw error
+        console.log(`Giving up after ${attempt} attempts. Not retriable: ${!retriable}`)
+        throw lastError
       }
+      
       const delay = baseDelayMs * Math.pow(2, attempt - 1)
+      console.log(`Waiting ${delay}ms before retry...`)
       await new Promise((r) => setTimeout(r, delay))
     }
   }
@@ -213,20 +232,34 @@ export async function POST(request: NextRequest) {
     // Create SetupIntent for secure card saving
     console.log('Creating SetupIntent for customer:', customerId)
     try {
-      const setupIntent = await withRetries(() =>
-        stripe!.setupIntents.create({
+      const setupIntent = await withRetries(() => {
+        console.log('Attempting to create SetupIntent...')
+        return stripe!.setupIntents.create({
           customer: customerId,
           payment_method_types: ['card'],
           usage: 'off_session',
+          // Add metadata for debugging
+          metadata: {
+            created_by: 'api',
+            user_id: user.id,
+            timestamp: new Date().toISOString()
+          }
         })
-      )
+      }, 4, 1000) // 4 retries with 1s base delay
 
       console.log('SetupIntent created successfully:', setupIntent.id)
       return NextResponse.json({ 
         clientSecret: setupIntent.client_secret
       })
     } catch (setupError) {
-      console.error('SetupIntent creation error:', setupError)
+      console.error('SetupIntent creation error after retries:', setupError)
+      
+      // Detailed error logging
+      if (setupError instanceof Error) {
+        console.error('Error name:', setupError.name)
+        console.error('Error stack:', setupError.stack)
+      }
+      
       throw setupError
     }
 
