@@ -347,6 +347,15 @@ export default function StripeCardForm({ onSuccess, onCancel }: StripeCardFormPr
         const errorData = await response.json().catch(() => ({}))
         console.error('API error response:', errorData)
         console.error('Response status:', response.status, response.statusText)
+        console.error('Error details:', JSON.stringify(errorData, null, 2))
+        
+        // Show user-friendly error message
+        if (errorData.error) {
+          console.error('Specific error:', errorData.error)
+        }
+        if (errorData.code) {
+          console.error('Error code:', errorData.code)
+        }
       }
     } catch (error) {
       console.error('Failed to initialize payment setup:', error)

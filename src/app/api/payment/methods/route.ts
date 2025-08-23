@@ -126,16 +126,28 @@ export async function POST(request: NextRequest) {
   console.log('Environment:', process.env.NODE_ENV)
   console.log('Stripe configured:', !!stripe)
   console.log('STRIPE_SECRET_KEY exists:', !!process.env.STRIPE_SECRET_KEY)
+  console.log('Request URL:', request.url)
+  console.log('Request method:', request.method)
+  console.log('Request headers:', Object.fromEntries(request.headers.entries()))
   
   // Check if Stripe is configured
   if (!stripe) {
     console.error('Stripe not configured - STRIPE_SECRET_KEY missing')
     return NextResponse.json(
-      { error: 'Payment service is not configured' },
+      { error: 'Payment service is not configured - Stripe keys not found' },
       { status: 503 }
     )
   }
-  // At this point, stripe is guaranteed to be non-null
+
+  // Validate Stripe key format
+  const stripeKey = process.env.STRIPE_SECRET_KEY
+  if (stripeKey && !stripeKey.startsWith('sk_')) {
+    console.error('Invalid Stripe secret key format - should start with sk_')
+    return NextResponse.json(
+      { error: 'Invalid Stripe configuration' },
+      { status: 400 }
+    )
+  }
 
   try {
     console.log('Creating Supabase client...')

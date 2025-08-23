@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/supabase'
 import { ArrowDownLeft, Shield, Lock, CheckCircle } from 'lucide-react'
 import StripeCardForm from '@/components/StripeCardForm'
+import DebugInfo from '@/components/DebugInfo'
 
 export default function AddPaymentMethodPage() {
   const [user, setUser] = useState<any>(null)
@@ -100,6 +101,13 @@ export default function AddPaymentMethodPage() {
 
         {/* Content */}
         <div className="p-4">
+          {/* Debug Info - Remove in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-4">
+              <DebugInfo />
+            </div>
+          )}
+          
           <StripeCardForm
             onSuccess={handleSuccess}
             onCancel={handleBack}
